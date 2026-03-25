@@ -97,38 +97,6 @@ public sealed class CodedInputStream : IDisposable
     //     The default limit is 100.
     public int RecursionLimit => state.recursionLimit;
 
-    //
-    // 摘要:
-    //     Internal-only property; when set to true, unknown fields will be discarded while
-    //     parsing.
-    internal bool DiscardUnknownFields
-    {
-        get
-        {
-            return state.DiscardUnknownFields;
-        }
-        set
-        {
-            state.DiscardUnknownFields = value;
-        }
-    }
-
-    //
-    // 摘要:
-    //     Internal-only property; provides extension identifiers to compatible messages
-    //     while parsing.
-    internal ExtensionRegistry ExtensionRegistry
-    {
-        get
-        {
-            return state.ExtensionRegistry;
-        }
-        set
-        {
-            state.ExtensionRegistry = value;
-        }
-    }
-
     internal byte[] InternalBuffer => buffer;
 
     internal Stream InternalInputStream => input;

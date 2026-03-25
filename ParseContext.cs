@@ -31,38 +31,6 @@ public ref struct ParseContext
 
     //
     // 摘要:
-    //     Internal-only property; when set to true, unknown fields will be discarded while
-    //     parsing.
-    internal bool DiscardUnknownFields
-    {
-        get
-        {
-            return state.DiscardUnknownFields;
-        }
-        set
-        {
-            state.DiscardUnknownFields = value;
-        }
-    }
-
-    //
-    // 摘要:
-    //     Internal-only property; provides extension identifiers to compatible messages
-    //     while parsing.
-    internal ExtensionRegistry ExtensionRegistry
-    {
-        get
-        {
-            return state.ExtensionRegistry;
-        }
-        set
-        {
-            state.ExtensionRegistry = value;
-        }
-    }
-
-    //
-    // 摘要:
     //     Initialize a Google.Protobuf.ParseContext, building all Google.Protobuf.ParserInternalState
     //     from defaults and the given buffer.
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -121,8 +89,6 @@ public ref struct ParseContext
         SegmentedBufferHelper.Initialize(input, out ctx.state.segmentedBufferHelper, out ctx.buffer);
         ctx.state.bufferPos = 0;
         ctx.state.bufferSize = ctx.buffer.Length;
-        ctx.state.DiscardUnknownFields = false;
-        ctx.state.ExtensionRegistry = null;
     }
 
     //

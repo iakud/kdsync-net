@@ -420,7 +420,7 @@ internal static class ParsingPrimitives
             return array;
         }
 
-        List<byte[]> list = new List<byte[]>();
+        Repeated<byte[]> list = new Repeated<byte[]>();
         int num = state.bufferSize - state.bufferPos;
         byte[] array2 = new byte[num];
         buffer.Slice(state.bufferPos, num).CopyTo(array2);

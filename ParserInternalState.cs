@@ -55,16 +55,4 @@ internal struct ParserInternalState
     internal int recursionLimit;
 
     internal CodedInputStream CodedInputStream => segmentedBufferHelper.CodedInputStream;
-
-    //
-    // 摘要:
-    //     Internal-only property; when set to true, unknown fields will be discarded while
-    //     parsing.
-    internal bool DiscardUnknownFields { get; set; }
-
-    //
-    // 摘要:
-    //     Internal-only property; provides extension identifiers to compatible messages
-    //     while parsing.
-    internal ExtensionRegistry ExtensionRegistry { get; set; }
 }
