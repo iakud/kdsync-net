@@ -1,10 +1,5 @@
-using System;
 using System.Buffers;
 using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Security;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
@@ -41,10 +36,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         }
     }
 
-    //
-    // 摘要:
-    //     A codec for a specific map field. This contains all the information required
-    //     to encode and decode the nested messages.
     public sealed class Codec
     {
         private readonly FieldCodec<TKey> keyCodec;
@@ -53,35 +44,12 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
         private readonly uint mapTag;
 
-        //
-        // 摘要:
-        //     The key codec.
         internal FieldCodec<TKey> KeyCodec => keyCodec;
 
-        //
-        // 摘要:
-        //     The value codec.
         internal FieldCodec<TValue> ValueCodec => valueCodec;
 
-        //
-        // 摘要:
-        //     The tag used in the enclosing message to indicate map entries.
         internal uint MapTag => mapTag;
 
-        //
-        // 摘要:
-        //     Creates a new entry codec based on a separate key codec and value codec, and
-        //     the tag to use for each map entry.
-        //
-        // 参数:
-        //   keyCodec:
-        //     The key codec.
-        //
-        //   valueCodec:
-        //     The value codec.
-        //
-        //   mapTag:
-        //     The map tag to use to introduce each map entry.
         public Codec(FieldCodec<TKey> keyCodec, FieldCodec<TValue> valueCodec, uint mapTag)
         {
             this.keyCodec = keyCodec;
@@ -185,23 +153,23 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     }
 
     public class ChangedEvent
-	{
-		private bool _clear;
-		public bool Clear => _clear;
+    {
+        private bool _clear;
+        public bool Clear => _clear;
 
-		private ICollection<TKey> _deletes;
-		public ICollection<TKey> Deletes => _deletes;
+        private ICollection<TKey> _deletes;
+        public ICollection<TKey> Deletes => _deletes;
 
-		private ICollection<TKey> _updates;
-		public ICollection<TKey> Updates => _updates;
+        private ICollection<TKey> _updates;
+        public ICollection<TKey> Updates => _updates;
 
-		public ChangedEvent(bool clear, ICollection<TKey> deletes, ICollection<TKey> updates)
-		{
-			_clear = clear;
-			_deletes = deletes;
-			_updates = updates;
-		}
-	}
+        public ChangedEvent(bool clear, ICollection<TKey> deletes, ICollection<TKey> updates)
+        {
+            _clear = clear;
+            _deletes = deletes;
+            _updates = updates;
+        }
+    }
 
     public const int ClearFieldNumber = 1;
 
@@ -219,28 +187,12 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     private bool _clear = false;
 
-	private readonly HashSet<TKey> _deletes = new HashSet<TKey>(KeyEqualityComparer);
+    private readonly HashSet<TKey> _deletes = new HashSet<TKey>(KeyEqualityComparer);
 
-	private readonly Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>> _updates = new Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>>(KeyEqualityComparer);
+    private readonly Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>> _updates = new Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>>(KeyEqualityComparer);
 
     public event Action<Map<TKey, TValue>, ChangedEvent>? OnChanged;
 
-    //
-    // 摘要:
-    //     Gets or sets the value associated with the specified key.
-    //
-    // 参数:
-    //   key:
-    //     The key of the value to get or set.
-    //
-    // 返回结果:
-    //     The value associated with the specified key. If the specified key is not found,
-    //     a get operation throws a System.Collections.Generic.KeyNotFoundException, and
-    //     a set operation creates a new element with the specified key.
-    //
-    // 异常:
-    //   T:System.Collections.Generic.KeyNotFoundException:
-    //     The property is retrieved and key does not exist in the collection.
     public TValue this[TKey key]
     {
         get
@@ -277,24 +229,12 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         }
     }
 
-    //
-    // 摘要:
-    //     Gets a collection containing the keys in the map.
     public ICollection<TKey> Keys => new MapView<TKey>(this, (KeyValuePair<TKey, TValue> pair) => pair.Key, ContainsKey);
 
-    //
-    // 摘要:
-    //     Gets a collection containing the values in the map.
     public ICollection<TValue> Values => new MapView<TValue>(this, (KeyValuePair<TKey, TValue> pair) => pair.Value, ContainsValue);
 
-    //
-    // 摘要:
-    //     Gets the number of elements contained in the map.
     public int Count => list.Count;
 
-    //
-    // 摘要:
-    //     Gets a value indicating whether the map is read-only.
     public bool IsReadOnly => false;
 
     bool IDictionary.IsFixedSize => false;
@@ -330,48 +270,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => Values;
 
-    //
-    // 摘要:
-    //     Creates a deep clone of this object.
-    //
-    // 返回结果:
-    //     A deep clone of this object.
-    public Map<TKey, TValue> Clone()
-    {
-        Map<TKey, TValue> mapField = new Map<TKey, TValue>();
-        if (typeof(IDeepCloneable<TValue>).IsAssignableFrom(typeof(TValue)))
-        {
-            foreach (KeyValuePair<TKey, TValue> item in list)
-            {
-                mapField.Add(item.Key, ((IDeepCloneable<TValue>)(object)item.Value).Clone());
-            }
-        }
-        else
-        {
-            mapField.Add(this);
-        }
-
-        return mapField;
-    }
-
-    //
-    // 摘要:
-    //     Adds the specified key/value pair to the map.
-    //
-    // 参数:
-    //   key:
-    //     The key to add
-    //
-    //   value:
-    //     The value to add.
-    //
-    // 异常:
-    //   T:System.ArgumentException:
-    //     The given key already exists in map.
-    //
-    // 言论：
-    //     This operation fails if the key already exists in the map. To replace an existing
-    //     entry, use the indexer.
     public void Add(TKey key, TValue value)
     {
         if (ContainsKey(key))
@@ -382,16 +280,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         this[key] = value;
     }
 
-    //
-    // 摘要:
-    //     Determines whether the specified key is present in the map.
-    //
-    // 参数:
-    //   key:
-    //     The key to check.
-    //
-    // 返回结果:
-    //     true if the map contains the given key; false otherwise.
     public bool ContainsKey(TKey key)
     {
         ProtoPreconditions.CheckNotNullUnconstrained(key, "key");
@@ -403,16 +291,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return list.Any((KeyValuePair<TKey, TValue> pair) => ValueEqualityComparer.Equals(pair.Value, value));
     }
 
-    //
-    // 摘要:
-    //     Removes the entry identified by the given key from the map.
-    //
-    // 参数:
-    //   key:
-    //     The key indicating the entry to remove from the map.
-    //
-    // 返回结果:
-    //     true if the map contained the given key before the entry was removed; false otherwise.
     public bool Remove(TKey key)
     {
         ProtoPreconditions.CheckNotNullUnconstrained(key, "key");
@@ -428,21 +306,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return false;
     }
 
-    //
-    // 摘要:
-    //     Gets the value associated with the specified key.
-    //
-    // 参数:
-    //   key:
-    //     The key whose value to get.
-    //
-    //   value:
-    //     When this method returns, the value associated with the specified key, if the
-    //     key is found; otherwise, the default value for the type of the value parameter.
-    //     This parameter is passed uninitialized.
-    //
-    // 返回结果:
-    //     true if the map contains an element with the specified key; otherwise, false.
     public bool TryGetValue(TKey key, out TValue value)
     {
         if (map.TryGetValue(key, out var value2))
@@ -455,14 +318,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return false;
     }
 
-    //
-    // 摘要:
-    //     Adds the specified entries to the map. The keys and values are not automatically
-    //     cloned.
-    //
-    // 参数:
-    //   entries:
-    //     The entries to add to the map.
     public void Add(IDictionary<TKey, TValue> entries)
     {
         ProtoPreconditions.CheckNotNull(entries, "entries");
@@ -472,18 +327,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         }
     }
 
-    //
-    // 摘要:
-    //     Adds the specified entries to the map, replacing any existing entries with the
-    //     same keys. The keys and values are not automatically cloned.
-    //
-    // 参数:
-    //   entries:
-    //     The entries to add to the map.
-    //
-    // 言论：
-    //     This method primarily exists to be called from MergeFrom methods in generated
-    //     classes for messages.
     public void MergeFrom(IDictionary<TKey, TValue> entries)
     {
         ProtoPreconditions.CheckNotNull(entries, "entries");
@@ -493,61 +336,30 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         }
     }
 
-    //
-    // 摘要:
-    //     Returns an enumerator that iterates through the collection.
-    //
-    // 返回结果:
-    //     An enumerator that can be used to iterate through the collection.
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
         return list.GetEnumerator();
     }
 
-    //
-    // 摘要:
-    //     Returns an enumerator that iterates through a collection.
-    //
-    // 返回结果:
-    //     An System.Collections.IEnumerator object that can be used to iterate through
-    //     the collection.
     IEnumerator IEnumerable.GetEnumerator()
     {
         return GetEnumerator();
     }
 
-    //
-    // 摘要:
-    //     Adds the specified item to the map.
-    //
-    // 参数:
-    //   item:
-    //     The item to add to the map.
     void ICollection<KeyValuePair<TKey, TValue>>.Add(KeyValuePair<TKey, TValue> item)
     {
         Add(item.Key, item.Value);
     }
 
-    //
-    // 摘要:
-    //     Removes all items from the map.
     public void Clear()
     {
         list.Clear();
         map.Clear();
         _updates.Clear();
-		_deletes.Clear();
+        _deletes.Clear();
         _clear = true;
     }
 
-    //
-    // 摘要:
-    //     Determines whether map contains an entry equivalent to the given key/value pair.
-    //
-    //
-    // 参数:
-    //   item:
-    //     The key/value pair to find.
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item)
     {
         if (TryGetValue(item.Key, out var value))
@@ -558,34 +370,11 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return false;
     }
 
-    //
-    // 摘要:
-    //     Copies the key/value pairs in this map to an array.
-    //
-    // 参数:
-    //   array:
-    //     The array to copy the entries into.
-    //
-    //   arrayIndex:
-    //     The index of the array at which to start copying values.
     void ICollection<KeyValuePair<TKey, TValue>>.CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
     {
         list.CopyTo(array, arrayIndex);
     }
 
-    //
-    // 摘要:
-    //     Removes the specified key/value pair from the map.
-    //
-    // 参数:
-    //   item:
-    //     The key/value pair to remove.
-    //
-    // 返回结果:
-    //     true if the key/value pair was found and removed; false otherwise.
-    //
-    // 言论：
-    //     Both the key and the value must be found for the entry to be removed.
     bool ICollection<KeyValuePair<TKey, TValue>>.Remove(KeyValuePair<TKey, TValue> item)
     {
         if (item.Key == null)
@@ -603,28 +392,11 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return false;
     }
 
-    //
-    // 摘要:
-    //     Determines whether the specified System.Object, is equal to this instance.
-    //
-    // 参数:
-    //   other:
-    //     The System.Object to compare with this instance.
-    //
-    // 返回结果:
-    //     true if the specified System.Object is equal to this instance; otherwise, false.
     public override bool Equals(object other)
     {
         return Equals(other as Map<TKey, TValue>);
     }
 
-    //
-    // 摘要:
-    //     Returns a hash code for this instance.
-    //
-    // 返回结果:
-    //     A hash code for this instance, suitable for use in hashing algorithms and data
-    //     structures like a hash table.
     public override int GetHashCode()
     {
         EqualityComparer<TKey> keyEqualityComparer = KeyEqualityComparer;
@@ -638,20 +410,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return num;
     }
 
-    //
-    // 摘要:
-    //     Compares this map with another for equality.
-    //
-    // 参数:
-    //   other:
-    //     The map to compare this with.
-    //
-    // 返回结果:
-    //     true if other refers to an equal map; false otherwise.
-    //
-    // 言论：
-    //     The order of the key/value pairs in the maps is not deemed significant in this
-    //     comparison.
     public bool Equals(Map<TKey, TValue> other)
     {
         if (other == null)
@@ -698,7 +456,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
             if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
             {
-                throw InvalidProtocolBufferException.RecursionLimitExceeded();
+                throw InvalidException.RecursionLimitExceeded();
             }
 
             int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
@@ -707,7 +465,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             ParsingPrimitivesMessages.CheckReadEndOfStreamTag(ref ctx.state);
             if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
             {
-                throw InvalidProtocolBufferException.TruncatedMessage();
+                throw InvalidException.TruncatedMessage();
             }
 
             ctx.state.recursionDepth--;
@@ -758,7 +516,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                     break;
                 default:
                     ParsingPrimitivesMessages.SkipLastField(ref ctx.buffer, ref ctx.state);
-				    break;
+                    break;
             }
         }
         if (clear)
@@ -782,7 +540,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     {
         TKey key = codec.KeyCodec.DefaultValue;
         // TValue val = codec.ValueCodec.DefaultValue;
-        
+
         ParseContext.Initialize(new ReadOnlySequence<byte>(new byte[1]), out var valCtx);
         uint tag;
         while ((tag = ctx.ReadTag()) != 0)
@@ -797,7 +555,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                 valCtx.buffer = ctx.buffer;
                 valCtx.state = ctx.state;
                 ParsingPrimitivesMessages.SkipLastField(ref ctx.buffer, ref ctx.state);
-                
+
             }
             else
             {
@@ -808,7 +566,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         ParsingPrimitivesMessages.CheckReadEndOfStreamTag(ref ctx.state);
         if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
         {
-            throw InvalidProtocolBufferException.TruncatedMessage();
+            throw InvalidException.TruncatedMessage();
         }
         if (TryGetValue(key, out var value))
         {
@@ -828,16 +586,16 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     }
 
     public string ToString(string indent)
-	{
-		var sb = new System.Text.StringBuilder();
-		sb.Append("[\n");
-		var sortedKeys = map.Keys.ToList();
-		sortedKeys.Sort();
-		foreach (var k in sortedKeys)
-		{
-			var v = map[k].Value.Value;
-			var key = k is bool ? k.ToString().ToLower() : k.ToString();
-            
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("[\n");
+        var sortedKeys = map.Keys.ToList();
+        sortedKeys.Sort();
+        foreach (var k in sortedKeys)
+        {
+            var v = map[k].Value.Value;
+            var key = k is bool ? k.ToString().ToLower() : k.ToString();
+
             if (v is IMessage message)
             {
                 sb.AppendLine(indent + "  " + key + " = " + message.ToString(indent + "  "));
@@ -854,37 +612,25 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             {
                 sb.AppendLine(indent + "  " + key + " = " + v.ToString());
             }
-		}
-		sb.Append(indent + "]");
-		return sb.ToString();
-	}
+        }
+        sb.Append(indent + "]");
+        return sb.ToString();
+    }
 
     public void RaiseChanged()
     {
         if (!_clear && _deletes.Count == 0 && _updates.Count == 0)
-			return;
-		OnChanged?.Invoke(this, new ChangedEvent(_clear, _deletes, _updates.Keys));
+            return;
+        OnChanged?.Invoke(this, new ChangedEvent(_clear, _deletes, _updates.Keys));
     }
 
     public void ClearChanged()
     {
         _clear = false;
-		_deletes.Clear();
-		_updates.Clear();
+        _deletes.Clear();
+        _updates.Clear();
     }
 
-
-    //
-    // 摘要:
-    //     Writes the contents of this map to the given coded output stream, using the specified
-    //     codec to encode each entry.
-    //
-    // 参数:
-    //   output:
-    //     The output stream to write to.
-    //
-    //   codec:
-    //     The codec to use for each entry.
     public void WriteTo(CodedOutputStream output, Codec codec)
     {
         WriteContext.Initialize(output, out var ctx);
@@ -911,17 +657,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return obj;
     }
 
-    //
-    // 摘要:
-    //     Writes the contents of this map to the given write context, using the specified
-    //     codec to encode each entry.
-    //
-    // 参数:
-    //   ctx:
-    //     The write context to write to.
-    //
-    //   codec:
-    //     The codec to use for each entry.
     [SecuritySafeCritical]
     public void WriteTo(ref WriteContext ctx, Codec codec)
     {
@@ -947,13 +682,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         }
     }
 
-    //
-    // 摘要:
-    //     Calculates the size of this map based on the given entry codec.
-    //
-    // 参数:
-    //   codec:
-    //     The codec to use to encode each entry.
     public int CalculateSize(Codec codec)
     {
         if (Count == 0)
@@ -977,10 +705,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return codec.KeyCodec.CalculateSizeWithTag(entry.Key) + codec.ValueCodec.CalculateSizeWithTag(entry.Value);
     }
 
-    //
-    // 摘要:
-    //     Returns a string representation of this repeated field, in the same way as it
-    //     would be represented by the default JSON formatter.
     public override string ToString()
     {
         StringWriter stringWriter = new StringWriter();

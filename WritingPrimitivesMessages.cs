@@ -38,7 +38,7 @@ internal static class WritingPrimitivesMessages
     {
         if (ctx.state.CodedOutputStream == null)
         {
-            throw new InvalidProtocolBufferException("Message " + message.GetType().Name + " doesn't provide the generated method that enables WriteContext-based serialization. You might need to regenerate the generated protobuf code.");
+            throw new InvalidException("Message " + message.GetType().Name + " doesn't provide the generated method that enables WriteContext-based serialization. You might need to regenerate the generated protobuf code.");
         }
 
         ctx.CopyStateTo(ctx.state.CodedOutputStream);

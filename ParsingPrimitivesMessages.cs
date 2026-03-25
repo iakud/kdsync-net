@@ -8,9 +8,6 @@ using Google.Protobuf;
 
 namespace Kdsync;
 
-//
-// 摘要:
-//     Reading and skipping messages / groups
 [SecuritySafeCritical]
 internal static class ParsingPrimitivesMessages
 {
@@ -29,7 +26,7 @@ internal static class ParsingPrimitivesMessages
                 SkipGroup(ref buffer, ref state, state.lastTag);
                 break;
             case WireFormat.WireType.EndGroup:
-                throw new InvalidProtocolBufferException("SkipLastField called on an end-group tag, indicating that the corresponding start-group was missing");
+                throw new InvalidException("SkipLastField called on an end-group tag, indicating that the corresponding start-group was missing");
             case WireFormat.WireType.Fixed32:
                 ParsingPrimitives.ParseRawLittleEndian32(ref buffer, ref state);
                 break;
@@ -48,15 +45,12 @@ internal static class ParsingPrimitivesMessages
         }
     }
 
-    //
-    // 摘要:
-    //     Skip a group.
     public static void SkipGroup(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, uint startGroupTag)
     {
         state.recursionDepth++;
         if (state.recursionDepth >= state.recursionLimit)
         {
-            throw InvalidProtocolBufferException.RecursionLimitExceeded();
+            throw InvalidException.RecursionLimitExceeded();
         }
 
         uint num;
@@ -65,7 +59,7 @@ internal static class ParsingPrimitivesMessages
             num = ParsingPrimitives.ParseTag(ref buffer, ref state);
             if (num == 0)
             {
-                throw InvalidProtocolBufferException.TruncatedMessage();
+                throw InvalidException.TruncatedMessage();
             }
 
             if (WireFormat.GetTagWireType(num) == WireFormat.WireType.EndGroup)
@@ -80,7 +74,7 @@ internal static class ParsingPrimitivesMessages
         int tagFieldNumber2 = WireFormat.GetTagFieldNumber(num);
         if (tagFieldNumber != tagFieldNumber2)
         {
-            throw new InvalidProtocolBufferException($"Mismatched end-group tag. Started with field {tagFieldNumber}; ended with field {tagFieldNumber2}");
+            throw new InvalidException($"Mismatched end-group tag. Started with field {tagFieldNumber}; ended with field {tagFieldNumber2}");
         }
 
         state.recursionDepth--;
@@ -91,7 +85,7 @@ internal static class ParsingPrimitivesMessages
         int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
         if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
         {
-            throw InvalidProtocolBufferException.RecursionLimitExceeded();
+            throw InvalidException.RecursionLimitExceeded();
         }
 
         int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
@@ -100,7 +94,7 @@ internal static class ParsingPrimitivesMessages
         CheckReadEndOfStreamTag(ref ctx.state);
         if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
         {
-            throw InvalidProtocolBufferException.TruncatedMessage();
+            throw InvalidException.TruncatedMessage();
         }
 
         ctx.state.recursionDepth--;
@@ -165,7 +159,7 @@ internal static class ParsingPrimitivesMessages
     {
         if (ctx.state.CodedInputStream == null)
         {
-            throw new InvalidProtocolBufferException("Message " + message.GetType().Name + " doesn't provide the generated method that enables ParseContext-based parsing. You might need to regenerate the generated protobuf code.");
+            throw new InvalidException("Message " + message.GetType().Name + " doesn't provide the generated method that enables ParseContext-based parsing. You might need to regenerate the generated protobuf code.");
         }
 
         ctx.CopyStateTo(ctx.state.CodedInputStream);
@@ -179,19 +173,11 @@ internal static class ParsingPrimitivesMessages
         }
     }
 
-    //
-    // 摘要:
-    //     Verifies that the last call to ReadTag() returned tag 0 - in other words, we've
-    //     reached the end of the stream when we expected to.
-    //
-    // 异常:
-    //   T:Google.Protobuf.InvalidProtocolBufferException:
-    //     The tag read was not the one specified
     public static void CheckReadEndOfStreamTag(ref ParserInternalState state)
     {
         if (state.lastTag != 0)
         {
-            throw InvalidProtocolBufferException.MoreDataAvailable();
+            throw InvalidException.MoreDataAvailable();
         }
     }
 
@@ -199,7 +185,7 @@ internal static class ParsingPrimitivesMessages
     {
         if (state.lastTag != expectedTag)
         {
-            throw InvalidProtocolBufferException.InvalidEndTag();
+            throw InvalidException.InvalidEndTag();
         }
     }
 }

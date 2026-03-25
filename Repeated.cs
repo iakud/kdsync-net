@@ -1,12 +1,13 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
 using System.Security;
+using System.Text.Json;
 using Google.Protobuf;
 using Google.Protobuf.Collections;
 
 namespace Kdsync;
 
-public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable, IList, ICollection, IDeepCloneable<Repeated<T>>, IEquatable<Repeated<T>>, IReadOnlyList<T>, IReadOnlyCollection<T>
+public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable, IList, ICollection, IEquatable<Repeated<T>>, IReadOnlyList<T>, IReadOnlyCollection<T>
 {
     public class ChangedEvent
     {
@@ -86,25 +87,6 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
         {
             this[index] = (T)value;
         }
-    }
-
-    public Repeated<T> Clone()
-    {
-        Repeated<T> repeatedField = new Repeated<T>();
-        if (this.array != EmptyArray)
-        {
-            repeatedField.array = (T[])this.array.Clone();
-            if (repeatedField.array is IDeepCloneable<T>[] array)
-            {
-                for (int i = 0; i < count; i++)
-                {
-                    repeatedField.array[i] = array[i].Clone();
-                }
-            }
-        }
-
-        repeatedField.count = count;
-        return repeatedField;
     }
 
     public void AddEntriesFrom(CodedInputStream input, FieldCodec<T> codec)
@@ -399,6 +381,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
     {
         StringWriter stringWriter = new StringWriter();
         // JsonFormatter.Default.WriteList(stringWriter, this);
+        JsonFormatter.Default.WriteValue(stringWriter, this);
         return stringWriter.ToString();
     }
 

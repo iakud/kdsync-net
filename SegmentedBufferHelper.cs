@@ -87,14 +87,14 @@ internal struct SegmentedBufferHelper
     {
         if (byteLimit < 0)
         {
-            throw InvalidProtocolBufferException.NegativeSize();
+            throw InvalidException.NegativeSize();
         }
 
         byteLimit += state.totalBytesRetired + state.bufferPos;
         int currentLimit = state.currentLimit;
         if (byteLimit > currentLimit)
         {
-            throw InvalidProtocolBufferException.TruncatedMessage();
+            throw InvalidException.TruncatedMessage();
         }
 
         state.currentLimit = byteLimit;
@@ -147,7 +147,7 @@ internal struct SegmentedBufferHelper
         {
             if (mustSucceed)
             {
-                throw InvalidProtocolBufferException.TruncatedMessage();
+                throw InvalidException.TruncatedMessage();
             }
 
             return false;
@@ -170,7 +170,7 @@ internal struct SegmentedBufferHelper
         {
             if (mustSucceed)
             {
-                throw InvalidProtocolBufferException.TruncatedMessage();
+                throw InvalidException.TruncatedMessage();
             }
 
             return false;
@@ -180,7 +180,7 @@ internal struct SegmentedBufferHelper
         int num = state.totalBytesRetired + state.bufferSize + state.bufferSizeAfterLimit;
         if (num < 0 || num > state.sizeLimit)
         {
-            throw InvalidProtocolBufferException.SizeLimitExceeded();
+            throw InvalidException.SizeLimitExceeded();
         }
 
         return true;
@@ -193,7 +193,7 @@ internal struct SegmentedBufferHelper
         {
             if (mustSucceed)
             {
-                throw InvalidProtocolBufferException.TruncatedMessage();
+                throw InvalidException.TruncatedMessage();
             }
 
             return false;
@@ -212,7 +212,7 @@ internal struct SegmentedBufferHelper
         {
             if (mustSucceed)
             {
-                throw InvalidProtocolBufferException.TruncatedMessage();
+                throw InvalidException.TruncatedMessage();
             }
 
             return false;
@@ -222,7 +222,7 @@ internal struct SegmentedBufferHelper
         int num = state.totalBytesRetired + state.bufferSize + state.bufferSizeAfterLimit;
         if (num < 0 || num > state.sizeLimit)
         {
-            throw InvalidProtocolBufferException.SizeLimitExceeded();
+            throw InvalidException.SizeLimitExceeded();
         }
 
         return true;
