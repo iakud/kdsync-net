@@ -82,9 +82,8 @@ public class Timestamp : IMessage, IEquatable<Timestamp>
         return num;
     }
 
-    public void MergeFrom(byte[] buffer)
+    public void MergeFrom(CodedInputStream input)
     {
-        CodedInputStream input = new CodedInputStream(buffer);
         uint tag;
         while ((tag = input.ReadTag()) != 0)
         {
@@ -102,6 +101,15 @@ public class Timestamp : IMessage, IEquatable<Timestamp>
                     break;
             }
         }
+    }
+
+    public void WriteTo(CodedOutputStream output)
+    {
+        
+    }
+    public int CalculateSize()
+    {
+        return 0;
     }
 
     public string ToString(string indent)

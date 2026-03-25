@@ -4,9 +4,8 @@ using Google.Protobuf;
 
 public class Empty : IMessage
 {
-    public void MergeFrom(byte[] buffer)
+    public void MergeFrom(CodedInputStream input)
     {
-        CodedInputStream input = new CodedInputStream(buffer);
         uint tag;
         while ((tag = input.ReadTag()) != 0)
         {
@@ -18,6 +17,15 @@ public class Empty : IMessage
                     break;
             }
         }
+    }
+
+    public void WriteTo(CodedOutputStream output)
+    {
+        
+    }
+    public int CalculateSize()
+    {
+        return 0;
     }
 
     public string ToString(string indent)

@@ -3,16 +3,12 @@ using Google.Protobuf.Collections;
 
 namespace Kdsync;
 
-internal delegate void ValueWriter<T>(ref CodedOutputStream output, T value);
-
-internal delegate TValue ValueReader<out TValue>(ref CodedInputStream input);
-
 public sealed class FieldCodec<T>
 {
     //
     // 摘要:
     //     Merges an input stream into a value
-    internal delegate void InputMerger(ref CodedInputStream ctx, ref T value);
+    internal delegate void InputMerger(ref ParseContext ctx, ref T value);
 
     //
     // 摘要:
@@ -27,6 +23,8 @@ public sealed class FieldCodec<T>
     private static readonly bool TypeSupportsPacking;
 
     private readonly int tagSize;
+
+    internal bool PackedRepeatedField { get; }
 
     //
     // 摘要:
@@ -100,6 +98,16 @@ public sealed class FieldCodec<T>
         }
     }
 
+    internal static bool IsPackedRepeatedField(uint tag)
+    {
+        if (TypeSupportsPacking)
+        {
+            return WireFormat.GetTagWireType(tag) == WireFormat.WireType.LengthDelimited;
+        }
+
+        return false;
+    }
+
     internal FieldCodec(ValueReader<T> reader, ValueWriter<T> writer, int fixedSize, uint tag, T defaultValue)
         : this(reader, writer, (Func<T, int>)((T _) => fixedSize), tag, defaultValue)
     {
@@ -107,9 +115,9 @@ public sealed class FieldCodec<T>
     }
 
     internal FieldCodec(ValueReader<T> reader, ValueWriter<T> writer, Func<T, int> sizeCalculator, uint tag, T defaultValue)
-        : this(reader, writer, (InputMerger)delegate (ref CodedInputStream input, ref T v)
+        : this(reader, writer, (InputMerger)delegate (ref ParseContext ctx, ref T v)
         {
-            v = reader(ref input);
+            v = reader(ref ctx);
         }, (ValuesMerger)delegate (ref T v, T v2)
         {
             v = v2;
@@ -139,6 +147,80 @@ public sealed class FieldCodec<T>
         {
             tagSize += CodedOutputStream.ComputeRawVarint32Size(endTag);
         }
+
+        PackedRepeatedField = IsPackedRepeatedField(tag);
+    }
+
+    //
+    // 摘要:
+    //     Write a tag and the given value, *if* the value is not the default.
+    public void WriteTagAndValue(CodedOutputStream output, T value)
+    {
+        WriteContext.Initialize(output, out var ctx);
+        try
+        {
+            WriteTagAndValue(ref ctx, value);
+        }
+        finally
+        {
+            ctx.CopyStateTo(output);
+        }
+    }
+
+    //
+    // 摘要:
+    //     Write a tag and the given value, *if* the value is not the default.
+    public void WriteTagAndValue(ref WriteContext ctx, T value)
+    {
+        if (!IsDefault(value))
+        {
+            ctx.WriteTag(Tag);
+            ValueWriter(ref ctx, value);
+            if (EndTag != 0)
+            {
+                ctx.WriteTag(EndTag);
+            }
+        }
+    }
+
+    //
+    // 摘要:
+    //     Reads a value of the codec type from the given Google.Protobuf.CodedInputStream.
+    //
+    //
+    // 参数:
+    //   input:
+    //     The input stream to read from.
+    //
+    // 返回结果:
+    //     The value read from the stream.
+    public T Read(CodedInputStream input)
+    {
+        ParseContext.Initialize(input, out var ctx);
+        try
+        {
+            return ValueReader(ref ctx);
+        }
+        finally
+        {
+            ctx.CopyStateTo(input);
+        }
+    }
+
+    //
+    // 摘要:
+    //     Reads a value of the codec type from the given Google.Protobuf.ParseContext.
+    //
+    //
+    // 参数:
+    //   ctx:
+    //     The parse context to read from.
+    //
+    // 返回结果:
+    //     The value read.
+    public T Read(ref ParseContext ctx)
+    {
+        return ValueReader(ref ctx);
     }
 
     //
@@ -188,21 +270,6 @@ public static class FieldCodec
     public static FieldCodec<string> ForString(uint tag)
     {
         return ForString(tag, "");
-    }
-
-    //
-    // 摘要:
-    //     Retrieves a codec suitable for a bytes field with the given tag.
-    //
-    // 参数:
-    //   tag:
-    //     The tag.
-    //
-    // 返回结果:
-    //     A codec for the given tag.
-    public static FieldCodec<ByteString> ForBytes(uint tag)
-    {
-        return ForBytes(tag, ByteString.Empty);
     }
 
     //
@@ -436,12 +503,12 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<string> ForString(uint tag, string defaultValue)
     {
-        return new FieldCodec<string>(delegate (ref CodedInputStream input)
+        return new FieldCodec<string>(delegate (ref ParseContext ctx)
         {
-            return input.ReadString();
-        }, delegate (ref CodedOutputStream output, string value)
+            return ctx.ReadString();
+        }, delegate (ref WriteContext ctx, string value)
         {
-            output.WriteString(value);
+            ctx.WriteString(value);
         }, CodedOutputStream.ComputeStringSize, tag, defaultValue);
     }
 
@@ -458,14 +525,14 @@ public static class FieldCodec
     //
     // 返回结果:
     //     A codec for the given tag.
-    public static FieldCodec<ByteString> ForBytes(uint tag, ByteString defaultValue)
+    public static FieldCodec<byte[]> ForBytes(uint tag, byte[] defaultValue)
     {
-        return new FieldCodec<ByteString>(delegate (ref CodedInputStream input)
+        return new FieldCodec<byte[]>(delegate (ref ParseContext ctx)
         {
-            return input.ReadBytes();
-        }, delegate (ref CodedOutputStream output, ByteString value)
+            return ctx.ReadBytes();
+        }, delegate (ref WriteContext ctx, byte[] value)
         {
-            output.WriteBytes(value);
+            ctx.WriteBytes(value);
         }, CodedOutputStream.ComputeBytesSize, tag, defaultValue);
     }
 
@@ -484,12 +551,12 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<bool> ForBool(uint tag, bool defaultValue)
     {
-        return new FieldCodec<bool>(delegate (ref CodedInputStream input)
+        return new FieldCodec<bool>(delegate (ref ParseContext ctx)
         {
-            return input.ReadBool();
-        }, delegate (ref CodedOutputStream output, bool value)
+            return ctx.ReadBool();
+        }, delegate (ref WriteContext ctx, bool value)
         {
-            output.WriteBool(value);
+            ctx.WriteBool(value);
         }, 1, tag, defaultValue);
     }
 
@@ -508,10 +575,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<int> ForInt32(uint tag, int defaultValue)
     {
-        return new FieldCodec<int>(delegate (ref CodedInputStream input)
+        return new FieldCodec<int>(delegate (ref ParseContext ctx)
         {
-            return input.ReadInt32();
-        }, delegate (ref CodedOutputStream output, int value)
+            return ctx.ReadInt32();
+        }, delegate (ref WriteContext output, int value)
         {
             output.WriteInt32(value);
         }, CodedOutputStream.ComputeInt32Size, tag, defaultValue);
@@ -532,10 +599,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<int> ForSInt32(uint tag, int defaultValue)
     {
-        return new FieldCodec<int>(delegate (ref CodedInputStream input)
+        return new FieldCodec<int>(delegate (ref ParseContext ctx)
         {
-            return input.ReadSInt32();
-        }, delegate (ref CodedOutputStream output, int value)
+            return ctx.ReadSInt32();
+        }, delegate (ref WriteContext output, int value)
         {
             output.WriteSInt32(value);
         }, CodedOutputStream.ComputeSInt32Size, tag, defaultValue);
@@ -556,10 +623,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<uint> ForFixed32(uint tag, uint defaultValue)
     {
-        return new FieldCodec<uint>(delegate (ref CodedInputStream input)
+        return new FieldCodec<uint>(delegate (ref ParseContext ctx)
         {
-            return input.ReadFixed32();
-        }, delegate (ref CodedOutputStream output, uint value)
+            return ctx.ReadFixed32();
+        }, delegate (ref WriteContext output, uint value)
         {
             output.WriteFixed32(value);
         }, 4, tag, defaultValue);
@@ -580,10 +647,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<int> ForSFixed32(uint tag, int defaultValue)
     {
-        return new FieldCodec<int>(delegate (ref CodedInputStream input)
+        return new FieldCodec<int>(delegate (ref ParseContext ctx)
         {
-            return input.ReadSFixed32();
-        }, delegate (ref CodedOutputStream output, int value)
+            return ctx.ReadSFixed32();
+        }, delegate (ref WriteContext output, int value)
         {
             output.WriteSFixed32(value);
         }, 4, tag, defaultValue);
@@ -604,10 +671,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<uint> ForUInt32(uint tag, uint defaultValue)
     {
-        return new FieldCodec<uint>(delegate (ref CodedInputStream input)
+        return new FieldCodec<uint>(delegate (ref ParseContext ctx)
         {
-            return input.ReadUInt32();
-        }, delegate (ref CodedOutputStream output, uint value)
+            return ctx.ReadUInt32();
+        }, delegate (ref WriteContext output, uint value)
         {
             output.WriteUInt32(value);
         }, CodedOutputStream.ComputeUInt32Size, tag, defaultValue);
@@ -628,10 +695,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<long> ForInt64(uint tag, long defaultValue)
     {
-        return new FieldCodec<long>(delegate (ref CodedInputStream input)
+        return new FieldCodec<long>(delegate (ref ParseContext ctx)
         {
-            return input.ReadInt64();
-        }, delegate (ref CodedOutputStream output, long value)
+            return ctx.ReadInt64();
+        }, delegate (ref WriteContext output, long value)
         {
             output.WriteInt64(value);
         }, CodedOutputStream.ComputeInt64Size, tag, defaultValue);
@@ -652,10 +719,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<long> ForSInt64(uint tag, long defaultValue)
     {
-        return new FieldCodec<long>(delegate (ref CodedInputStream input)
+        return new FieldCodec<long>(delegate (ref ParseContext ctx)
         {
-            return input.ReadSInt64();
-        }, delegate (ref CodedOutputStream output, long value)
+            return ctx.ReadSInt64();
+        }, delegate (ref WriteContext output, long value)
         {
             output.WriteSInt64(value);
         }, CodedOutputStream.ComputeSInt64Size, tag, defaultValue);
@@ -676,10 +743,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<ulong> ForFixed64(uint tag, ulong defaultValue)
     {
-        return new FieldCodec<ulong>(delegate (ref CodedInputStream input)
+        return new FieldCodec<ulong>(delegate (ref ParseContext ctx)
         {
-            return input.ReadFixed64();
-        }, delegate (ref CodedOutputStream output, ulong value)
+            return ctx.ReadFixed64();
+        }, delegate (ref WriteContext output, ulong value)
         {
             output.WriteFixed64(value);
         }, 8, tag, defaultValue);
@@ -700,10 +767,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<long> ForSFixed64(uint tag, long defaultValue)
     {
-        return new FieldCodec<long>(delegate (ref CodedInputStream input)
+        return new FieldCodec<long>(delegate (ref ParseContext ctx)
         {
-            return input.ReadSFixed64();
-        }, delegate (ref CodedOutputStream output, long value)
+            return ctx.ReadSFixed64();
+        }, delegate (ref WriteContext output, long value)
         {
             output.WriteSFixed64(value);
         }, 8, tag, defaultValue);
@@ -724,10 +791,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<ulong> ForUInt64(uint tag, ulong defaultValue)
     {
-        return new FieldCodec<ulong>(delegate (ref CodedInputStream input)
+        return new FieldCodec<ulong>(delegate (ref ParseContext ctx)
         {
-            return input.ReadUInt64();
-        }, delegate (ref CodedOutputStream output, ulong value)
+            return ctx.ReadUInt64();
+        }, delegate (ref WriteContext output, ulong value)
         {
             output.WriteUInt64(value);
         }, CodedOutputStream.ComputeUInt64Size, tag, defaultValue);
@@ -748,10 +815,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<float> ForFloat(uint tag, float defaultValue)
     {
-        return new FieldCodec<float>(delegate (ref CodedInputStream input)
+        return new FieldCodec<float>(delegate (ref ParseContext ctx)
         {
-            return input.ReadFloat();
-        }, delegate (ref CodedOutputStream output, float value)
+            return ctx.ReadFloat();
+        }, delegate (ref WriteContext output, float value)
         {
             output.WriteFloat(value);
         }, 4, tag, defaultValue);
@@ -772,10 +839,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<double> ForDouble(uint tag, double defaultValue)
     {
-        return new FieldCodec<double>(delegate (ref CodedInputStream input)
+        return new FieldCodec<double>(delegate (ref ParseContext ctx)
         {
-            return input.ReadDouble();
-        }, delegate (ref CodedOutputStream output, double value)
+            return ctx.ReadDouble();
+        }, delegate (ref WriteContext output, double value)
         {
             output.WriteDouble(value);
         }, 8, tag, defaultValue);
@@ -802,10 +869,10 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<T> ForEnum<T>(uint tag, Func<T, int> toInt32, Func<int, T> fromInt32, T defaultValue)
     {
-        return new FieldCodec<T>(delegate (ref CodedInputStream input)
+        return new FieldCodec<T>(delegate (ref ParseContext ctx)
         {
-            return fromInt32(input.ReadEnum());
-        }, delegate (ref CodedOutputStream output, T value)
+            return fromInt32(ctx.ReadEnum());
+        }, delegate (ref WriteContext output, T value)
         {
             output.WriteEnum(toInt32(value));
         }, (T value) => CodedOutputStream.ComputeEnumSize(toInt32(value)), tag, defaultValue);
@@ -826,25 +893,26 @@ public static class FieldCodec
     //     A codec for the given tag.
     public static FieldCodec<T> ForMessage<T>(uint tag) where T : class, IMessage, new()
     {
-        return new FieldCodec<T>(delegate (ref CodedInputStream input)
+        return new FieldCodec<T>(delegate (ref ParseContext ctx)
         {
+            // T val = parser.CreateTemplate();
             T val = new T();
-            val.MergeFrom(input.ReadBytes().ToByteArray());
+            ctx.ReadMessage(val);
             return val;
-        }, delegate (ref CodedOutputStream output, T value)
+        }, delegate (ref WriteContext output, T value)
         {
-            // FIXME: output.WriteMessage(value);
-        }, delegate (ref CodedInputStream input, ref T v)
+            output.WriteMessage(value);
+        }, delegate (ref ParseContext ctx, ref T v)
         {
             if (v == null)
             {
+                // v = parser.CreateTemplate();
                 v = new T();
             }
 
-            v.MergeFrom(input.ReadBytes().ToByteArray());
+            ctx.ReadMessage(v);
         }, delegate (ref T v, T v2)
         {
-            /*
             if (v2 == null)
             {
                 return false;
@@ -852,15 +920,14 @@ public static class FieldCodec
 
             if (v == null)
             {
-                v = v2.Clone();
+                // v = v2.Clone();
             }
             else
             {
-                v.MergeFrom(v2);
+                // v.MergeFrom(v2);
             }
-            */
 
             return true;
-        }, (T message) => /*CodedOutputStream.ComputeMessageSize(message)*/ 0, tag);
+        }, (T message) => CodedOutputStream.ComputeMessageSize(message), tag);
     }
 }
