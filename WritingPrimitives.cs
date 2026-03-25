@@ -3,9 +3,6 @@ using System;
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.Arm;
-using System.Runtime.Intrinsics.X86;
 using System.Security;
 using System.Text;
 using Google.Protobuf;
@@ -163,7 +160,7 @@ internal static class WritingPrimitives
             int num = value.Length - 4;
             do
             {
-                NarrowFourUtf16CharsToAsciiAndWriteToBuffer(ref Unsafe.AddByteOffset(ref reference2, (IntPtr)i), Unsafe.ReadUnaligned<ulong>(in Unsafe.AddByteOffset(ref source, (IntPtr)(i * 2))));
+                NarrowFourUtf16CharsToAsciiAndWriteToBuffer(ref Unsafe.AddByteOffset(ref reference2, (IntPtr)i), Unsafe.ReadUnaligned<ulong>(ref Unsafe.AddByteOffset(ref source, (IntPtr)(i * 2))));
             }
             while ((i += 4) <= num);
         }
@@ -184,18 +181,7 @@ internal static class WritingPrimitives
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void NarrowFourUtf16CharsToAsciiAndWriteToBuffer(ref byte outputBuffer, ulong value)
     {
-        if (Sse2.X64.IsSupported)
-        {
-            Vector128<short> vector = Sse2.X64.ConvertScalarToVector128UInt64(value).AsInt16();
-            Vector128<uint> value2 = Sse2.PackUnsignedSaturate(vector, vector).AsUInt32();
-            Unsafe.WriteUnaligned(ref outputBuffer, Sse2.ConvertToUInt32(value2));
-        }
-        else if (AdvSimd.IsSupported)
-        {
-            Vector64<byte> vector2 = AdvSimd.ExtractNarrowingSaturateUnsignedLower(Vector128.CreateScalarUnsafe(value).AsInt16());
-            Unsafe.WriteUnaligned(ref outputBuffer, vector2.AsUInt32().ToScalar());
-        }
-        else if (BitConverter.IsLittleEndian)
+        if (BitConverter.IsLittleEndian)
         {
             outputBuffer = (byte)value;
             value >>= 16;

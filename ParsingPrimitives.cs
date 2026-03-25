@@ -306,7 +306,7 @@ internal static class ParsingPrimitives
             return BitConverter.Int64BitsToDouble((long)ParseRawLittleEndian64(ref buffer, ref state));
         }
 
-        double result = Unsafe.ReadUnaligned<double>(in MemoryMarshal.GetReference(buffer.Slice(state.bufferPos, 8)));
+        double result = Unsafe.ReadUnaligned<double>(ref MemoryMarshal.GetReference(buffer.Slice(state.bufferPos, 8)));
         state.bufferPos += 8;
         return result;
     }
@@ -318,7 +318,7 @@ internal static class ParsingPrimitives
             return ParseFloatSlow(ref buffer, ref state);
         }
 
-        float result = Unsafe.ReadUnaligned<float>(in MemoryMarshal.GetReference(buffer.Slice(state.bufferPos, 4)));
+        float result = Unsafe.ReadUnaligned<float>(ref MemoryMarshal.GetReference(buffer.Slice(state.bufferPos, 4)));
         state.bufferPos += 4;
         return result;
     }
@@ -337,7 +337,7 @@ internal static class ParsingPrimitives
             span.Reverse();
         }
 
-        return Unsafe.ReadUnaligned<float>(in MemoryMarshal.GetReference(span));
+        return Unsafe.ReadUnaligned<float>(ref MemoryMarshal.GetReference(span));
     }
 
     public static byte[] ReadRawBytes(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, int size)
