@@ -1,6 +1,6 @@
 namespace Kdsync;
 
-public class Duration : IMessage
+public struct Duration : IEquatable<Duration>
 {
     public const int SecondsFieldNumber = 1;
 
@@ -46,37 +46,39 @@ public class Duration : IMessage
         }
     }
 
-    public void MergeFrom(ref ParseContext ctx)
+    public Duration(long seconds, int nanos)
     {
-        uint tag;
-        while ((tag = ctx.ReadTag()) != 0)
+        seconds_ = seconds;
+        nanos_ = nanos;
+    }
+
+    public override bool Equals(object other)
+    {
+        return Equals(other is Duration);
+    }
+
+    public bool Equals(Duration other)
+    {
+        return Seconds != other.Seconds && Nanos == other.Nanos;
+    }
+
+    public override int GetHashCode()
+    {
+        int num = 1;
+        if (Seconds != 0L)
         {
-            var num = WireFormat.GetTagFieldNumber(tag);
-            switch (num)
-            {
-                case SecondsFieldNumber:
-                    Seconds = ctx.ReadInt64();
-                    break;
-                case NanosFieldNumber:
-                    Nanos = ctx.ReadInt32();
-                    break;
-                default:
-                    ctx.SkipLastField();
-                    break;
-            }
+            num ^= Seconds.GetHashCode();
         }
+
+        if (Nanos != 0)
+        {
+            num ^= Nanos.GetHashCode();
+        }
+
+        return num;
     }
 
-    public void WriteTo(CodedOutputStream output)
-    {
-        
-    }
-    public int CalculateSize()
-    {
-        return 0;
-    }
-
-    public string ToString(string indent)
+    public override string ToString()
     {
         return "{Seconds: " + Seconds + ", Nanos: " + Nanos + "}";
     }
@@ -121,21 +123,16 @@ public class Duration : IMessage
 
     public static Duration operator -(Duration value)
     {
-        ProtoPreconditions.CheckNotNull(value, "value");
         return checked(Normalize(-value.Seconds, -value.Nanos));
     }
 
     public static Duration operator +(Duration lhs, Duration rhs)
     {
-        ProtoPreconditions.CheckNotNull(lhs, "lhs");
-        ProtoPreconditions.CheckNotNull(rhs, "rhs");
         return checked(Normalize(lhs.Seconds + rhs.Seconds, lhs.Nanos + rhs.Nanos));
     }
 
     public static Duration operator -(Duration lhs, Duration rhs)
     {
-        ProtoPreconditions.CheckNotNull(lhs, "lhs");
-        ProtoPreconditions.CheckNotNull(rhs, "rhs");
         return checked(Normalize(lhs.Seconds - rhs.Seconds, lhs.Nanos - rhs.Nanos));
     }
 
@@ -190,5 +187,35 @@ public class Duration : IMessage
         }
 
         return 1;
+    }
+
+    public static bool operator <(Duration a, Duration b)
+    {
+        return a.CompareTo(b) < 0;
+    }
+
+    public static bool operator >(Duration a, Duration b)
+    {
+        return a.CompareTo(b) > 0;
+    }
+
+    public static bool operator <=(Duration a, Duration b)
+    {
+        return a.CompareTo(b) <= 0;
+    }
+
+    public static bool operator >=(Duration a, Duration b)
+    {
+        return a.CompareTo(b) >= 0;
+    }
+
+    public static bool operator ==(Duration a, Duration b)
+    {
+        return a.Equals(b);
+    }
+
+    public static bool operator !=(Duration a, Duration b)
+    {
+        return !(a == b);
     }
 }

@@ -221,6 +221,21 @@ public static class FieldCodec
         return ForDouble(tag, 0.0);
     }
 
+    public static FieldCodec<Timestamp> ForTimestamp(uint tag)
+    {
+        return ForTimestamp(tag, default);
+    }
+
+    public static FieldCodec<Duration> ForDuration(uint tag)
+    {
+        return ForDuration(tag, default);
+    }
+
+    public static FieldCodec<Empty> ForEmpty(uint tag)
+    {
+        return ForEmpty(tag, default);
+    }
+
     public static FieldCodec<T> ForEnum<T>(uint tag, Func<T, int> toInt32, Func<int, T> fromInt32)
     {
         return ForEnum(tag, toInt32, fromInt32, default(T));
@@ -423,5 +438,38 @@ public static class FieldCodec
 
             ctx.ReadMessage(v);
         }, (T message) => CodedOutputStream.ComputeMessageSize(message), tag);
+    }
+
+    public static FieldCodec<Timestamp> ForTimestamp(uint tag, Timestamp defaultValue)
+    {
+        return new FieldCodec<Timestamp>(delegate (ref ParseContext ctx)
+        {
+            return ctx.ReadTimestamp();
+        }, delegate (ref WriteContext output, Timestamp value)
+        {
+            // FIXME: output.WriteTimestamp(value);
+        }, 8, tag, defaultValue);
+    }
+
+    public static FieldCodec<Duration> ForDuration(uint tag, Duration defaultValue)
+    {
+        return new FieldCodec<Duration>(delegate (ref ParseContext ctx)
+        {
+            return ctx.ReadDuration();
+        }, delegate (ref WriteContext output, Duration value)
+        {
+            // output.WriteDuration(value);
+        }, 8, tag, defaultValue);
+    }
+
+    public static FieldCodec<Empty> ForEmpty(uint tag, Empty defaultValue)
+    {
+        return new FieldCodec<Empty>(delegate (ref ParseContext ctx)
+        {
+            return ctx.ReadEmpty();
+        }, delegate (ref WriteContext output, Empty value)
+        {
+            // output.WriteEmpty(value);
+        }, 8, tag, defaultValue);
     }
 }

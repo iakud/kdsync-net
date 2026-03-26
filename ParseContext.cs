@@ -182,6 +182,24 @@ public ref struct ParseContext
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Timestamp ReadTimestamp()
+    {
+        return ParsingPrimitivesMessages.ReadTimestamp(ref this);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Duration ReadDuration()
+    {
+        return ParsingPrimitivesMessages.ReadDuration(ref this);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public Empty ReadEmpty()
+    {
+        return ParsingPrimitivesMessages.ReadEmpty(ref this);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int ReadLength()
     {
         return (int)ParsingPrimitives.ParseRawVarint32(ref buffer, ref state);

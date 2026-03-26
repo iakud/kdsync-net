@@ -1,33 +1,34 @@
 namespace Kdsync;
 
-public class Empty : IMessage
+public struct Empty : IEquatable<Empty>
 {
-    public void MergeFrom(ref ParseContext ctx)
+    public override bool Equals(object other)
     {
-        uint tag;
-        while ((tag = ctx.ReadTag()) != 0)
-        {
-            var num = WireFormat.GetTagFieldNumber(tag);
-            switch (num)
-            {
-                default:
-                    ctx.SkipLastField();
-                    break;
-            }
-        }
+        return Equals(other is Empty);
     }
 
-    public void WriteTo(CodedOutputStream output)
+    public bool Equals(Empty other)
     {
-        
-    }
-    public int CalculateSize()
-    {
-        return 0;
+        return true;
     }
 
-    public string ToString(string indent)
+    public override int GetHashCode()
+    {
+        return 1;
+    }
+
+    public override string ToString()
     {
         return "{}";
+    }
+
+    public static bool operator ==(Empty a, Empty b)
+    {
+        return a.Equals(b);
+    }
+
+    public static bool operator !=(Empty a, Empty b)
+    {
+        return !(a == b);
     }
 }

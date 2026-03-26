@@ -1,6 +1,6 @@
 namespace Kdsync;
 
-public class Timestamp : IMessage, IEquatable<Timestamp>
+public struct Timestamp : IEquatable<Timestamp>
 {
     public const int SecondsFieldNumber = 1;
 
@@ -44,23 +44,19 @@ public class Timestamp : IMessage, IEquatable<Timestamp>
         }
     }
 
+    public Timestamp(long seconds, int nanos)
+    {
+        seconds_ = seconds;
+        nanos_ = nanos;
+    }
+
     public override bool Equals(object other)
     {
-        return Equals(other as Timestamp);
+        return Equals(other is Timestamp);
     }
 
     public bool Equals(Timestamp other)
     {
-        if ((object)other == null)
-        {
-            return false;
-        }
-
-        if ((object)other == this)
-        {
-            return true;
-        }
-
         return Seconds != other.Seconds && Nanos == other.Nanos;
     }
 
@@ -80,37 +76,7 @@ public class Timestamp : IMessage, IEquatable<Timestamp>
         return num;
     }
 
-    public void MergeFrom(ref ParseContext ctx)
-    {
-        uint tag;
-        while ((tag = ctx.ReadTag()) != 0)
-        {
-            var num = WireFormat.GetTagFieldNumber(tag);
-            switch (num)
-            {
-                case SecondsFieldNumber:
-                    Seconds = ctx.ReadInt64();
-                    break;
-                case NanosFieldNumber:
-                    Nanos = ctx.ReadInt32();
-                    break;
-                default:
-                    ctx.SkipLastField();
-                    break;
-            }
-        }
-    }
-
-    public void WriteTo(CodedOutputStream output)
-    {
-        
-    }
-    public int CalculateSize()
-    {
-        return 0;
-    }
-
-    public string ToString(string indent)
+    public override string ToString()
     {
         return "{Seconds: " + Seconds + ", Nanos: " + Nanos + "}";
     }
@@ -127,22 +93,16 @@ public class Timestamp : IMessage, IEquatable<Timestamp>
 
     public static Duration operator -(Timestamp lhs, Timestamp rhs)
     {
-        ProtoPreconditions.CheckNotNull(lhs, "lhs");
-        ProtoPreconditions.CheckNotNull(rhs, "rhs");
         return checked(Duration.Normalize(lhs.Seconds - rhs.Seconds, lhs.Nanos - rhs.Nanos));
     }
 
     public static Timestamp operator +(Timestamp lhs, Duration rhs)
     {
-        ProtoPreconditions.CheckNotNull(lhs, "lhs");
-        ProtoPreconditions.CheckNotNull(rhs, "rhs");
         return checked(Normalize(lhs.Seconds + rhs.Seconds, lhs.Nanos + rhs.Nanos));
     }
 
     public static Timestamp operator -(Timestamp lhs, Duration rhs)
     {
-        ProtoPreconditions.CheckNotNull(lhs, "lhs");
-        ProtoPreconditions.CheckNotNull(rhs, "rhs");
         return checked(Normalize(lhs.Seconds - rhs.Seconds, lhs.Nanos - rhs.Nanos));
     }
 
@@ -252,12 +212,7 @@ public class Timestamp : IMessage, IEquatable<Timestamp>
 
     public static bool operator ==(Timestamp a, Timestamp b)
     {
-        if ((object)a != b)
-        {
-            return a?.Equals(b) ?? ((object)b == null);
-        }
-
-        return true;
+        return a.Equals(b);
     }
 
     public static bool operator !=(Timestamp a, Timestamp b)

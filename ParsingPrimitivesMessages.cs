@@ -169,4 +169,135 @@ internal static class ParsingPrimitivesMessages
             throw InvalidException.InvalidEndTag();
         }
     }
+
+    public static Timestamp ReadTimestamp(ref ParseContext ctx)
+    {
+        int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+        {
+            throw InvalidException.RecursionLimitExceeded();
+        }
+
+        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
+        ctx.state.recursionDepth++;
+        Timestamp val = ReadRawTimestamp(ref ctx);
+        CheckReadEndOfStreamTag(ref ctx.state);
+        if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+        {
+            throw InvalidException.TruncatedMessage();
+        }
+
+        ctx.state.recursionDepth--;
+        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
+        return val;
+    }
+
+    public static Timestamp ReadRawTimestamp(ref ParseContext ctx)
+    {
+        Timestamp val = new Timestamp();
+        uint tag;
+        while ((tag = ctx.ReadTag()) != 0)
+        {
+            var num = WireFormat.GetTagFieldNumber(tag);
+            switch (num)
+            {
+                case Timestamp.SecondsFieldNumber:
+                    val.Seconds = ctx.ReadInt64();
+                    break;
+                case Timestamp.NanosFieldNumber:
+                    val.Nanos = ctx.ReadInt32();
+                    break;
+                default:
+                    ctx.SkipLastField();
+                    break;
+            }
+        }
+        return val;
+    }
+
+
+    public static Duration ReadDuration(ref ParseContext ctx)
+    {
+        int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+        {
+            throw InvalidException.RecursionLimitExceeded();
+        }
+
+        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
+        ctx.state.recursionDepth++;
+        Duration val = ReadRawDuration(ref ctx);
+        CheckReadEndOfStreamTag(ref ctx.state);
+        if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+        {
+            throw InvalidException.TruncatedMessage();
+        }
+
+        ctx.state.recursionDepth--;
+        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
+        return val;
+    }
+
+    public static Duration ReadRawDuration(ref ParseContext ctx)
+    {
+        Duration val = new Duration();
+        uint tag;
+        while ((tag = ctx.ReadTag()) != 0)
+        {
+            var num = WireFormat.GetTagFieldNumber(tag);
+            switch (num)
+            {
+                case Duration.SecondsFieldNumber:
+                    val.Seconds = ctx.ReadInt64();
+                    break;
+                case Duration.NanosFieldNumber:
+                    val.Nanos = ctx.ReadInt32();
+                    break;
+                default:
+                    ctx.SkipLastField();
+                    break;
+            }
+        }
+        return val;
+    }
+
+
+    public static Empty ReadEmpty(ref ParseContext ctx)
+    {
+        int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+        {
+            throw InvalidException.RecursionLimitExceeded();
+        }
+
+        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
+        ctx.state.recursionDepth++;
+        Empty val = ReadRawEmpty(ref ctx);
+        CheckReadEndOfStreamTag(ref ctx.state);
+        if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+        {
+            throw InvalidException.TruncatedMessage();
+        }
+
+        ctx.state.recursionDepth--;
+        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
+        return val;
+    }
+
+    public static Empty ReadRawEmpty(ref ParseContext ctx)
+    {
+        Empty val = new Empty();
+        uint tag;
+        while ((tag = ctx.ReadTag()) != 0)
+        {
+            var num = WireFormat.GetTagFieldNumber(tag);
+            switch (num)
+            {
+                default:
+                    ctx.SkipLastField();
+                    break;
+            }
+        }
+        return val;
+    }
 }
