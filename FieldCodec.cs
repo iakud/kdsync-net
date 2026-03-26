@@ -123,19 +123,6 @@ public sealed class FieldCodec<T>
         }
     }
 
-    public T Read(CodedInputStream input)
-    {
-        ParseContext.Initialize(input, out var ctx);
-        try
-        {
-            return ValueReader(ref ctx);
-        }
-        finally
-        {
-            ctx.CopyStateTo(input);
-        }
-    }
-
     public T Read(ref ParseContext ctx)
     {
         return ValueReader(ref ctx);

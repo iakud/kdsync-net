@@ -1,19 +1,17 @@
 namespace Kdsync;
 
-using Google.Protobuf;
-
 public class Empty : IMessage
 {
-    public void MergeFrom(CodedInputStream input)
+    public void MergeFrom(ref ParseContext ctx)
     {
         uint tag;
-        while ((tag = input.ReadTag()) != 0)
+        while ((tag = ctx.ReadTag()) != 0)
         {
             var num = WireFormat.GetTagFieldNumber(tag);
             switch (num)
             {
                 default:
-                    input.SkipLastField();
+                    ctx.SkipLastField();
                     break;
             }
         }

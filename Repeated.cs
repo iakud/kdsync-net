@@ -88,36 +88,33 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
         }
     }
 
-    public void AddEntriesFrom(CodedInputStream input, FieldCodec<T> codec)
+    public void AddEntriesFrom(ref ParseContext ctx, FieldCodec<T> codec)
     {
-        ParseContext.Initialize(input, out var ctx);
-        try
+        int byteLimit = ctx.ReadLength();
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
         {
-            AddEntriesFrom(ref ctx, codec);
+            throw InvalidException.RecursionLimitExceeded();
         }
-        finally
+        int oldLimit = ctx.PushLimit(byteLimit);
+        ctx.state.recursionDepth++;
+        MergeFrom(ref ctx, codec);
+        if (!ctx.ReachedLimit)
         {
-            ctx.CopyStateTo(input);
+            throw InvalidException.TruncatedMessage();
         }
+
+        ctx.state.recursionDepth--;
+        ctx.PopLimit(oldLimit);
     }
 
-    public void AddEntriesFrom(ref ParseContext ctx, FieldCodec<T> codec)
+    public void MergeFrom(ref ParseContext ctx, FieldCodec<T> codec)
     {
         Clear();
         ValueReader<T> valueReader = codec.ValueReader;
-        int num = ctx.ReadLength();
-        if (num <= 0)
-        {
-            return;
-        }
-        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, num);
-        ctx.state.recursionDepth++;
-        while (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+        while (!ctx.ReachedLimit)
         {
             Add(valueReader(ref ctx));
         }
-        ctx.state.recursionDepth--;
-        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
     }
 
     public void RaiseChanged()

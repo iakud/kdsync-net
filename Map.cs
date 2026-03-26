@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Collections;
 using System.Security;
-using Google.Protobuf;
 using Google.Protobuf.Collections;
 
 namespace Kdsync;
@@ -448,37 +447,29 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return true;
     }
 
-    public void AddEntriesFrom(CodedInputStream input, Codec codec)
+    public void AddEntriesFrom(ref ParseContext ctx, Codec codec)
     {
-        ParseContext.Initialize(input, out var ctx);
-        try
+        int byteLimit = ctx.ReadLength();
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
         {
-            int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-            if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
-            {
-                throw InvalidException.RecursionLimitExceeded();
-            }
-
-            int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
-            ctx.state.recursionDepth++;
-            AddEntriesFrom(ref ctx, codec);
-            ParsingPrimitivesMessages.CheckReadEndOfStreamTag(ref ctx.state);
-            if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
-            {
-                throw InvalidException.TruncatedMessage();
-            }
-
-            ctx.state.recursionDepth--;
-            SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
+            throw InvalidException.RecursionLimitExceeded();
         }
-        finally
+
+        int oldLimit = ctx.PushLimit(byteLimit);
+        ctx.state.recursionDepth++;
+        MergeFrom(ref ctx, codec);
+        ctx.CheckReadEndOfStreamTag();
+        if (!ctx.ReachedLimit)
         {
-            ctx.CopyStateTo(input);
+            throw InvalidException.TruncatedMessage();
         }
+
+        ctx.state.recursionDepth--;
+        ctx.PopLimit(oldLimit);
     }
 
     [SecuritySafeCritical]
-    public void AddEntriesFrom(ref ParseContext ctx, Codec codec)
+    private void MergeFrom(ref ParseContext ctx, Codec codec)
     {
         var clear = false;
         TKey[] deletes = new TKey[0];
@@ -494,28 +485,29 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                     break;
                 case DeletesFieldNumber:
 
-                    int byteLimit1 = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-                    int oldLimit1 = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit1);
+                    int byteLimit1 = ctx.ReadLength();
+                    int oldLimit1 = ctx.PushLimit(byteLimit1);
                     ctx.state.recursionDepth++;
-                    while (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+                    while (!ctx.ReachedLimit)
                     {
                         deletes = deletes.Append(codec.KeyCodec.ValueReader(ref ctx)).ToArray();
                     }
                     ctx.state.recursionDepth--;
-                    SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit1);
+                    ctx.PopLimit(oldLimit1);
                     break;
                 case EntriesFieldNumber:
-                    int byteLimit2 = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+                    int byteLimit2 = ctx.ReadLength();
 
-                    int oldLimit2 = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit2);
+                    int oldLimit2 = ctx.PushLimit(byteLimit2);
                     ctx.state.recursionDepth++;
                     entries = entries.Append(ctx.state).ToArray();
+                    // FIXME:
                     ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, byteLimit2);
                     ctx.state.recursionDepth--;
-                    SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit2);
+                    ctx.PopLimit(oldLimit2);
                     break;
                 default:
-                    ParsingPrimitivesMessages.SkipLastField(ref ctx.buffer, ref ctx.state);
+                    ctx.SkipLastField();
                     break;
             }
         }
@@ -554,17 +546,16 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             {
                 valCtx.buffer = ctx.buffer;
                 valCtx.state = ctx.state;
-                ParsingPrimitivesMessages.SkipLastField(ref ctx.buffer, ref ctx.state);
-
+                ctx.SkipLastField();
             }
             else
             {
-                ParsingPrimitivesMessages.SkipLastField(ref ctx.buffer, ref ctx.state);
+                ctx.SkipLastField();
             }
         }
 
-        ParsingPrimitivesMessages.CheckReadEndOfStreamTag(ref ctx.state);
-        if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+        ctx.CheckReadEndOfStreamTag();
+        if (!ctx.ReachedLimit)
         {
             throw InvalidException.TruncatedMessage();
         }

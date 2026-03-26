@@ -1,7 +1,5 @@
 namespace Kdsync;
 
-using Google.Protobuf;
-
 public class Duration : IMessage
 {
     public const int SecondsFieldNumber = 1;
@@ -48,22 +46,22 @@ public class Duration : IMessage
         }
     }
 
-    public void MergeFrom(CodedInputStream input)
+    public void MergeFrom(ref ParseContext ctx)
     {
         uint tag;
-        while ((tag = input.ReadTag()) != 0)
+        while ((tag = ctx.ReadTag()) != 0)
         {
             var num = WireFormat.GetTagFieldNumber(tag);
             switch (num)
             {
                 case SecondsFieldNumber:
-                    Seconds = input.ReadInt64();
+                    Seconds = ctx.ReadInt64();
                     break;
                 case NanosFieldNumber:
-                    Nanos = input.ReadInt32();
+                    Nanos = ctx.ReadInt32();
                     break;
                 default:
-                    input.SkipLastField();
+                    ctx.SkipLastField();
                     break;
             }
         }

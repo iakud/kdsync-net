@@ -17,8 +17,10 @@ public ref struct ParseContext
 
     internal uint LastTag => state.lastTag;
 
+    internal bool ReachedLimit => SegmentedBufferHelper.IsReachedLimit(ref state);
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void Initialize(ReadOnlySpan<byte> buffer, out ParseContext ctx)
+    public static void Initialize(ReadOnlySpan<byte> buffer, out ParseContext ctx)
     {
         ParserInternalState parserInternalState = new ParserInternalState
         {
@@ -36,13 +38,6 @@ public ref struct ParseContext
     {
         ctx.buffer = buffer;
         ctx.state = state;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void Initialize(CodedInputStream input, out ParseContext ctx)
-    {
-        ctx.buffer = new ReadOnlySpan<byte>(input.InternalBuffer);
-        ctx.state = input.InternalState;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -67,9 +62,21 @@ public ref struct ParseContext
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void CheckReadEndOfStreamTag()
+    {
+        ParsingPrimitivesMessages.CheckReadEndOfStreamTag(ref state);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public uint ReadTag()
     {
         return ParsingPrimitives.ParseTag(ref buffer, ref state);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void SkipLastField()
+    {
+        ParsingPrimitivesMessages.SkipLastField(ref buffer, ref state);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -180,13 +187,15 @@ public ref struct ParseContext
         return (int)ParsingPrimitives.ParseRawVarint32(ref buffer, ref state);
     }
 
-    internal void CopyStateTo(CodedInputStream input)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal int PushLimit(int byteLimit)
     {
-        input.InternalState = state;
+        return SegmentedBufferHelper.PushLimit(ref state, byteLimit);
     }
 
-    internal void LoadStateFrom(CodedInputStream input)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal void PopLimit(int oldLimit)
     {
-        state = input.InternalState;
+        SegmentedBufferHelper.PopLimit(ref state, oldLimit);
     }
 }

@@ -1,5 +1,3 @@
-using Google.Protobuf;
-
 namespace Kdsync;
 
 internal struct ParserInternalState
@@ -27,6 +25,4 @@ internal struct ParserInternalState
     internal int sizeLimit;
 
     internal int recursionLimit;
-
-    internal CodedInputStream CodedInputStream => segmentedBufferHelper.CodedInputStream;
 }

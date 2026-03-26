@@ -1,10 +1,4 @@
-
-using System;
-using System.Buffers;
-using System.Collections.Generic;
 using System.Security;
-using Google.Protobuf.Collections;
-using Google.Protobuf;
 
 namespace Kdsync;
 
@@ -157,20 +151,7 @@ internal static class ParsingPrimitivesMessages
 
     public static void ReadRawMessage(ref ParseContext ctx, IMessage message)
     {
-        if (ctx.state.CodedInputStream == null)
-        {
-            throw new InvalidException("Message " + message.GetType().Name + " doesn't provide the generated method that enables ParseContext-based parsing. You might need to regenerate the generated protobuf code.");
-        }
-
-        ctx.CopyStateTo(ctx.state.CodedInputStream);
-        try
-        {
-            message.MergeFrom(ctx.state.CodedInputStream);
-        }
-        finally
-        {
-            ctx.LoadStateFrom(ctx.state.CodedInputStream);
-        }
+        message.MergeFrom(ref ctx);
     }
 
     public static void CheckReadEndOfStreamTag(ref ParserInternalState state)
