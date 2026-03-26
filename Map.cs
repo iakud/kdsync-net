@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Collections;
 using System.Security;
-using Google.Protobuf.Collections;
 
 namespace Kdsync;
 
@@ -176,9 +175,9 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     public const int EntriesFieldNumber = 3;
 
-    private static readonly EqualityComparer<TValue> ValueEqualityComparer = ProtobufEqualityComparers.GetEqualityComparer<TValue>();
+    private static readonly EqualityComparer<TValue> ValueEqualityComparer = EqualityComparers.GetEqualityComparer<TValue>();
 
-    private static readonly EqualityComparer<TKey> KeyEqualityComparer = ProtobufEqualityComparers.GetEqualityComparer<TKey>();
+    private static readonly EqualityComparer<TKey> KeyEqualityComparer = EqualityComparers.GetEqualityComparer<TKey>();
 
     private readonly Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>> map = new Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>>(KeyEqualityComparer);
 
@@ -196,7 +195,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     {
         get
         {
-            ProtoPreconditions.CheckNotNullUnconstrained(key, "key");
+            Preconditions.CheckNotNullUnconstrained(key, "key");
             if (TryGetValue(key, out var value))
             {
                 return value;
@@ -206,10 +205,10 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         }
         set
         {
-            ProtoPreconditions.CheckNotNullUnconstrained(key, "key");
+            Preconditions.CheckNotNullUnconstrained(key, "key");
             if (value == null)
             {
-                ProtoPreconditions.CheckNotNullUnconstrained(value, "value");
+                Preconditions.CheckNotNullUnconstrained(value, "value");
             }
 
             KeyValuePair<TKey, TValue> value2 = new KeyValuePair<TKey, TValue>(key, value);
@@ -250,7 +249,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     {
         get
         {
-            ProtoPreconditions.CheckNotNull(key, "key");
+            Preconditions.CheckNotNull(key, "key");
             if (key is TKey key2)
             {
                 TryGetValue(key2, out var value);
@@ -281,7 +280,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     public bool ContainsKey(TKey key)
     {
-        ProtoPreconditions.CheckNotNullUnconstrained(key, "key");
+        Preconditions.CheckNotNullUnconstrained(key, "key");
         return map.ContainsKey(key);
     }
 
@@ -292,7 +291,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     public bool Remove(TKey key)
     {
-        ProtoPreconditions.CheckNotNullUnconstrained(key, "key");
+        Preconditions.CheckNotNullUnconstrained(key, "key");
         if (map.TryGetValue(key, out var value))
         {
             map.Remove(key);
@@ -319,7 +318,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     public void Add(IDictionary<TKey, TValue> entries)
     {
-        ProtoPreconditions.CheckNotNull(entries, "entries");
+        Preconditions.CheckNotNull(entries, "entries");
         foreach (KeyValuePair<TKey, TValue> entry in entries)
         {
             Add(entry.Key, entry.Value);
@@ -328,7 +327,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     public void MergeFrom(IDictionary<TKey, TValue> entries)
     {
-        ProtoPreconditions.CheckNotNull(entries, "entries");
+        Preconditions.CheckNotNull(entries, "entries");
         foreach (KeyValuePair<TKey, TValue> entry in entries)
         {
             this[entry.Key] = entry.Value;
@@ -725,7 +724,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     void IDictionary.Remove(object key)
     {
-        ProtoPreconditions.CheckNotNull(key, "key");
+        Preconditions.CheckNotNull(key, "key");
         if (key is TKey key2)
         {
             Remove(key2);

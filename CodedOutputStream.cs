@@ -400,7 +400,7 @@ public sealed class CodedOutputStream : IDisposable
     private CodedOutputStream(byte[] buffer, int offset, int length)
     {
         output = null;
-        this.buffer = ProtoPreconditions.CheckNotNull(buffer, "buffer");
+        this.buffer = Preconditions.CheckNotNull(buffer, "buffer");
         state.position = offset;
         state.limit = offset + length;
         WriteBufferHelper.Initialize(this, out state.writeBufferHelper);
@@ -409,7 +409,7 @@ public sealed class CodedOutputStream : IDisposable
 
     private CodedOutputStream(Stream output, byte[] buffer, bool leaveOpen)
     {
-        this.output = ProtoPreconditions.CheckNotNull(output, "output");
+        this.output = Preconditions.CheckNotNull(output, "output");
         this.buffer = buffer;
         state.position = 0;
         state.limit = buffer.Length;

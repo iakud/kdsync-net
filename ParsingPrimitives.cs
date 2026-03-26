@@ -7,9 +7,6 @@ using System.Text;
 
 namespace Kdsync;
 
-//
-// 摘要:
-//     Primitives for parsing protobuf wire format.
 [SecuritySafeCritical]
 internal static class ParsingPrimitives
 {

@@ -1,5 +1,4 @@
 using Google.Protobuf;
-using Google.Protobuf.Collections;
 
 namespace Kdsync;
 
@@ -37,7 +36,7 @@ public sealed class FieldCodec<T>
 
     static FieldCodec()
     {
-        EqualityComparer = ProtobufEqualityComparers.GetEqualityComparer<T>();
+        EqualityComparer = EqualityComparers.GetEqualityComparer<T>();
         TypeSupportsPacking = default(T) != null;
         if (typeof(T) == typeof(string))
         {

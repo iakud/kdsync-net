@@ -1,6 +1,6 @@
 namespace Kdsync;
 
-public static class ProtoPreconditions
+public static class Preconditions
 {
     public static T CheckNotNull<T>(T value, string name) where T : class
     {

@@ -1,8 +1,6 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
 using System.Security;
-using Google.Protobuf;
-using Google.Protobuf.Collections;
 
 namespace Kdsync;
 
@@ -12,7 +10,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
     {
     }
 
-    private static readonly EqualityComparer<T> EqualityComparer = ProtobufEqualityComparers.GetEqualityComparer<T>();
+    private static readonly EqualityComparer<T> EqualityComparer = EqualityComparers.GetEqualityComparer<T>();
 
     private static readonly T[] EmptyArray = new T[0];
 
@@ -213,7 +211,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
 
     public void AddRange(IEnumerable<T> values)
     {
-        ProtoPreconditions.CheckNotNull(values, "values");
+        Preconditions.CheckNotNull(values, "values");
         if (values is Repeated<T> repeatedField)
         {
             EnsureSize(count + repeatedField.count);
@@ -377,7 +375,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
     {
         StringWriter stringWriter = new StringWriter();
         // JsonFormatter.Default.WriteList(stringWriter, this);
-        JsonFormatter.Default.WriteValue(stringWriter, this);
+        // JsonFormatter.Default.WriteValue(stringWriter, this);
         return stringWriter.ToString();
     }
 
