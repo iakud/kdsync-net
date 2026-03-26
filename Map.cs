@@ -575,38 +575,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         }
     }
 
-    public string ToString(string indent)
-    {
-        var sb = new System.Text.StringBuilder();
-        sb.Append("[\n");
-        var sortedKeys = map.Keys.ToList();
-        sortedKeys.Sort();
-        foreach (var k in sortedKeys)
-        {
-            var v = map[k].Value.Value;
-            var key = k is bool ? k.ToString().ToLower() : k.ToString();
-
-            if (v is IMessage message)
-            {
-                sb.AppendLine(indent + "  " + key + " = " + message.ToString(indent + "  "));
-            }
-            else if (typeof(TValue).IsEnum)
-            {
-                sb.AppendLine(indent + "  " + key + " = " + Convert.ToInt32(v).ToString());
-            }
-            else if (v is bool)
-            {
-                sb.AppendLine(indent + "  " + key + " = " + v.ToString().ToLower());
-            }
-            else
-            {
-                sb.AppendLine(indent + "  " + key + " = " + v.ToString());
-            }
-        }
-        sb.Append(indent + "]");
-        return sb.ToString();
-    }
-
     public void RaiseChanged()
     {
         if (!_clear && _deletes.Count == 0 && _updates.Count == 0)

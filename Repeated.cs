@@ -1,6 +1,8 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
+using System.Runtime.Serialization.Json;
 using System.Security;
+using System.Text;
 
 namespace Kdsync;
 
@@ -123,34 +125,6 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
     public void ClearChanged()
     {
 
-    }
-
-    public string ToString(string indent)
-    {
-        var sb = new System.Text.StringBuilder();
-        sb.Append("[\n");
-        for (int i = 0; i < count; i++)
-        {
-            var v = array[i];
-            if (v is IMessage message)
-            {
-                sb.AppendLine(indent + "  " + message.ToString(indent + "  "));
-            }
-            else if (typeof(T).IsEnum)
-            {
-                sb.AppendLine(indent + "  " + Convert.ToInt32(v).ToString());
-            }
-            else if (v is bool)
-            {
-                sb.AppendLine(indent + "  " + v.ToString().ToLower());
-            }
-            else
-            {
-                sb.AppendLine(indent + "  " + v.ToString());
-            }
-        }
-        sb.Append(indent + "]");
-        return sb.ToString();
     }
 
     private void EnsureSize(int size)
@@ -376,6 +350,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
         StringWriter stringWriter = new StringWriter();
         // JsonFormatter.Default.WriteList(stringWriter, this);
         // JsonFormatter.Default.WriteValue(stringWriter, this);
+        // Google.Protobuf.JsonFormatter.Default.WriteValue
         return stringWriter.ToString();
     }
 
