@@ -6,6 +6,15 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
+
+    <PackageId>kdsync-net</PackageId>
+    <Version>1.0.1</Version>
+    <Authors>iakud</Authors>
+    <Description>kdsync library</Description>
+    <RepositoryUrl>https://github.com/iakud/kdsync-net</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>kdsync</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
