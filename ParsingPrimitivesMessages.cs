@@ -94,60 +94,60 @@ internal static class ParsingPrimitivesMessages
         ctx.state.recursionDepth--;
         SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
     }
-/*
-    public static KeyValuePair<TKey, TValue> ReadMapEntry<TKey, TValue>(ref ParseContext ctx, MapField<TKey, TValue>.Codec codec)
-    {
-        int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+    /*
+        public static KeyValuePair<TKey, TValue> ReadMapEntry<TKey, TValue>(ref ParseContext ctx, MapField<TKey, TValue>.Codec codec)
         {
-            throw InvalidProtocolBufferException.RecursionLimitExceeded();
-        }
+            int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+            if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+            {
+                throw InvalidProtocolBufferException.RecursionLimitExceeded();
+            }
 
-        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
-        ctx.state.recursionDepth++;
-        TKey key = codec.KeyCodec.DefaultValue;
-        TValue val = codec.ValueCodec.DefaultValue;
-        uint num;
-        while ((num = ctx.ReadTag()) != 0)
-        {
-            if (num == codec.KeyCodec.Tag)
+            int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
+            ctx.state.recursionDepth++;
+            TKey key = codec.KeyCodec.DefaultValue;
+            TValue val = codec.ValueCodec.DefaultValue;
+            uint num;
+            while ((num = ctx.ReadTag()) != 0)
             {
-                key = codec.KeyCodec.Read(ref ctx);
+                if (num == codec.KeyCodec.Tag)
+                {
+                    key = codec.KeyCodec.Read(ref ctx);
+                }
+                else if (num == codec.ValueCodec.Tag)
+                {
+                    val = codec.ValueCodec.Read(ref ctx);
+                }
+                else
+                {
+                    SkipLastField(ref ctx.buffer, ref ctx.state);
+                }
             }
-            else if (num == codec.ValueCodec.Tag)
-            {
-                val = codec.ValueCodec.Read(ref ctx);
-            }
-            else
-            {
-                SkipLastField(ref ctx.buffer, ref ctx.state);
-            }
-        }
 
-        if (val == null)
-        {
-            if (ctx.state.CodedInputStream != null)
+            if (val == null)
             {
-                val = codec.ValueCodec.Read(new CodedInputStream(ZeroLengthMessageStreamData));
+                if (ctx.state.CodedInputStream != null)
+                {
+                    val = codec.ValueCodec.Read(new CodedInputStream(ZeroLengthMessageStreamData));
+                }
+                else
+                {
+                    ParseContext.Initialize(new ReadOnlySequence<byte>(ZeroLengthMessageStreamData), out var ctx2);
+                    val = codec.ValueCodec.Read(ref ctx2);
+                }
             }
-            else
+
+            CheckReadEndOfStreamTag(ref ctx.state);
+            if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
             {
-                ParseContext.Initialize(new ReadOnlySequence<byte>(ZeroLengthMessageStreamData), out var ctx2);
-                val = codec.ValueCodec.Read(ref ctx2);
+                throw InvalidProtocolBufferException.TruncatedMessage();
             }
-        }
 
-        CheckReadEndOfStreamTag(ref ctx.state);
-        if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
-        {
-            throw InvalidProtocolBufferException.TruncatedMessage();
+            ctx.state.recursionDepth--;
+            SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
+            return new KeyValuePair<TKey, TValue>(key, val);
         }
-
-        ctx.state.recursionDepth--;
-        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
-        return new KeyValuePair<TKey, TValue>(key, val);
-    }
-*/
+    */
 
     public static void ReadRawMessage(ref ParseContext ctx, IMessage message)
     {

@@ -589,25 +589,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         _updates.Clear();
     }
 
-    public void WriteTo(CodedOutputStream output, Codec codec)
-    {
-        WriteContext.Initialize(output, out var ctx);
-        try
-        {
-            IEnumerable<KeyValuePair<TKey, TValue>> sortedListCopy = list;
-            if (output.Deterministic)
-            {
-                sortedListCopy = GetSortedListCopy(list);
-            }
-
-            WriteTo(ref ctx, codec, sortedListCopy);
-        }
-        finally
-        {
-            ctx.CopyStateTo(output);
-        }
-    }
-
     internal IEnumerable<KeyValuePair<TKey, TValue>> GetSortedListCopy(IEnumerable<KeyValuePair<TKey, TValue>> listToSort)
     {
         var obj = listToSort.ToList();
@@ -615,58 +596,10 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return obj;
     }
 
-    [SecuritySafeCritical]
-    public void WriteTo(ref WriteContext ctx, Codec codec)
-    {
-        IEnumerable<KeyValuePair<TKey, TValue>> sortedListCopy = list;
-        CodedOutputStream codedOutputStream = ctx.state.CodedOutputStream;
-        if (codedOutputStream != null && codedOutputStream.Deterministic)
-        {
-            sortedListCopy = GetSortedListCopy(list);
-        }
-
-        WriteTo(ref ctx, codec, sortedListCopy);
-    }
-
-    [SecuritySafeCritical]
-    private void WriteTo(ref WriteContext ctx, Codec codec, IEnumerable<KeyValuePair<TKey, TValue>> listKvp)
-    {
-        foreach (KeyValuePair<TKey, TValue> item in listKvp)
-        {
-            ctx.WriteTag(codec.MapTag);
-            WritingPrimitives.WriteLength(ref ctx.buffer, ref ctx.state, CalculateEntrySize(codec, item));
-            codec.KeyCodec.WriteTagAndValue(ref ctx, item.Key);
-            codec.ValueCodec.WriteTagAndValue(ref ctx, item.Value);
-        }
-    }
-
-    public int CalculateSize(Codec codec)
-    {
-        if (Count == 0)
-        {
-            return 0;
-        }
-
-        int num = 0;
-        foreach (KeyValuePair<TKey, TValue> item in list)
-        {
-            int num2 = CalculateEntrySize(codec, item);
-            num += CodedOutputStream.ComputeRawVarint32Size(codec.MapTag);
-            num += CodedOutputStream.ComputeLengthSize(num2) + num2;
-        }
-
-        return num;
-    }
-
-    private static int CalculateEntrySize(Codec codec, KeyValuePair<TKey, TValue> entry)
-    {
-        return codec.KeyCodec.CalculateSizeWithTag(entry.Key) + codec.ValueCodec.CalculateSizeWithTag(entry.Value);
-    }
-
     public override string ToString()
     {
         StringWriter stringWriter = new StringWriter();
-        // JsonFormatter.Default.WriteDictionary(stringWriter, this);
+        JsonFormatter.WriteDictionary(stringWriter, this);
         return stringWriter.ToString();
     }
 

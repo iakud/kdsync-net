@@ -1,12 +1,5 @@
 using System.Collections;
-using System.Collections.Concurrent;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.Globalization;
-using System.Reflection;
-using System.Text;
-using Google.Protobuf.Collections;
-using Google.Protobuf.Reflection;
 
 namespace Kdsync;
 
@@ -192,7 +185,7 @@ public static class JsonFormatter
             Format(message, writer, indentationLevel);
         }
     }
-    
+
     internal static void WriteList(TextWriter writer, IList list, int indentationLevel = 0)
     {
         WriteBracketOpen(writer, '[');
@@ -263,7 +256,7 @@ public static class JsonFormatter
         {
             entries[i++] = item;
         }
-        
+
         Array.Sort(entries, (a, b) => (a.GetType() == typeof(string)) ? StringComparer.Ordinal.Compare(a.Key.ToString(), b.Key.ToString()) : Comparer.Default.Compare(a.Key, b.Key));
         return entries;
     }

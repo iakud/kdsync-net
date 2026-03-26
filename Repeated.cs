@@ -1,8 +1,6 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
-using System.Runtime.Serialization.Json;
 using System.Security;
-using System.Text;
 
 namespace Kdsync;
 
@@ -348,9 +346,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
     public override string ToString()
     {
         StringWriter stringWriter = new StringWriter();
-        // JsonFormatter.Default.WriteList(stringWriter, this);
-        // JsonFormatter.Default.WriteValue(stringWriter, this);
-        // Google.Protobuf.JsonFormatter.Default.WriteValue
+        JsonFormatter.WriteList(stringWriter, this);
         return stringWriter.ToString();
     }
 
