@@ -213,7 +213,7 @@ public static class JsonFormatter
         WriteBracketOpen(writer, '{');
         bool flag = true;
 
-        foreach (DictionaryEntry item in dictionary)
+        foreach (DictionaryEntry item in SortDictionary(dictionary))
         {
             string text2;
             if (item.Key is string text)
@@ -252,6 +252,20 @@ public static class JsonFormatter
         }
 
         WriteBracketClose(writer, '}', !flag, indentationLevel);
+    }
+
+
+    private static DictionaryEntry[] SortDictionary(IDictionary dictionary)
+    {
+        var entries = new DictionaryEntry[dictionary.Count];
+        int i = 0;
+        foreach (DictionaryEntry item in dictionary)
+        {
+            entries[i++] = item;
+        }
+        
+        Array.Sort(entries, (a, b) => (a.GetType() == typeof(string)) ? StringComparer.Ordinal.Compare(a.Key.ToString(), b.Key.ToString()) : Comparer.Default.Compare(a.Key, b.Key));
+        return entries;
     }
 
     internal static void WriteString(TextWriter writer, string text)
