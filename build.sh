@@ -28,4 +28,4 @@ function printUsage() {
     $colorful && tput setaf 7
 }
 
-dotnet build --use-current-runtime src/kdsync-net/kdsync-net.csproj
+dotnet build --use-current-runtime src/Kdsync/Kdsync.csproj

@@ -4,7 +4,7 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "kdsync-net", "src\kdsync-net\kdsync-net.csproj", "{745ED29E-E9BB-511A-F619-EF66FF9D4FF4}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kdsync", "src\Kdsync\Kdsync.csproj", "{745ED29E-E9BB-511A-F619-EF66FF9D4FF4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
