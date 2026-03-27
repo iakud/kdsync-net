@@ -5,7 +5,7 @@ namespace Kdsync;
 [SecuritySafeCritical]
 internal static class ParsingPrimitivesMessages
 {
-    private static readonly byte[] ZeroLengthMessageStreamData = new byte[1];
+    public static readonly byte[] ZeroLengthMessageStreamData = new byte[1];
 
     public static void SkipLastField(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
@@ -260,7 +260,6 @@ internal static class ParsingPrimitivesMessages
         }
         return val;
     }
-
 
     public static Empty ReadEmpty(ref ParseContext ctx)
     {

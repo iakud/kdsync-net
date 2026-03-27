@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections;
+using System.Runtime.CompilerServices;
 using System.Security;
 
 namespace Kdsync;
@@ -446,7 +447,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         return true;
     }
 
-    public void AddEntriesFrom(ref ParseContext ctx, Codec codec)
+    public void MergeFrom(ref ParseContext ctx, Codec codec)
     {
         int byteLimit = ctx.ReadLength();
         if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
@@ -456,7 +457,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
         int oldLimit = ctx.PushLimit(byteLimit);
         ctx.state.recursionDepth++;
-        MergeFrom(ref ctx, codec);
+        MergeEntriesFrom(ref ctx, codec);
         ctx.CheckReadEndOfStreamTag();
         if (!ctx.ReachedLimit)
         {
@@ -468,11 +469,11 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     }
 
     [SecuritySafeCritical]
-    private void MergeFrom(ref ParseContext ctx, Codec codec)
+    private void MergeEntriesFrom(ref ParseContext ctx, Codec codec)
     {
         var clear = false;
-        TKey[] deletes = new TKey[0];
-        ParserInternalState[] entries = new ParserInternalState[0];
+        ParserInternalState? deleteState = null;
+        ParserInternalState? updateState = null;
         uint tag;
         while ((tag = ctx.ReadTag()) != 0)
         {
@@ -483,27 +484,12 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                     clear = ctx.ReadBool();
                     break;
                 case DeletesFieldNumber:
-
-                    int byteLimit1 = ctx.ReadLength();
-                    int oldLimit1 = ctx.PushLimit(byteLimit1);
-                    ctx.state.recursionDepth++;
-                    while (!ctx.ReachedLimit)
-                    {
-                        deletes = deletes.Append(codec.KeyCodec.ValueReader(ref ctx)).ToArray();
-                    }
-                    ctx.state.recursionDepth--;
-                    ctx.PopLimit(oldLimit1);
+                    deleteState = ctx.state;
+                    ctx.SkipLastField();
                     break;
                 case EntriesFieldNumber:
-                    int byteLimit2 = ctx.ReadLength();
-
-                    int oldLimit2 = ctx.PushLimit(byteLimit2);
-                    ctx.state.recursionDepth++;
-                    entries = entries.Append(ctx.state).ToArray();
-                    // FIXME:
-                    ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, byteLimit2);
-                    ctx.state.recursionDepth--;
-                    ctx.PopLimit(oldLimit2);
+                    updateState = ctx.state;
+                    ctx.SkipLastField();
                     break;
                 default:
                     ctx.SkipLastField();
@@ -514,25 +500,76 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         {
             Clear();
         }
-        foreach (var key in deletes)
+        if (deleteState.HasValue)
         {
-            Remove(key);
+            var deleteStateValue = deleteState.Value;
+            ParseContext.Initialize(ctx.buffer, ref deleteStateValue, out var deleteCtx);
+            MergeDeleteEntriesFrom(ref deleteCtx, codec);
         }
-
-        foreach (ParserInternalState entry in entries)
+        if (updateState.HasValue)
         {
-            ParserInternalState state = entry;
-            ParseContext.Initialize(ctx.buffer, ref state, out var entryCtx);
-            AddEntryFrom(ref entryCtx, codec);
+            var updateStateValue = updateState.Value;
+            ParseContext.Initialize(ctx.buffer, ref updateStateValue, out var updateCtx);
+            MergeUpdateEntriesFrom(ref updateCtx, codec);
         }
     }
 
-    private void AddEntryFrom(ref ParseContext ctx, Codec codec)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MergeDeleteEntriesFrom(ref ParseContext ctx, Codec codec)
+    {
+        int byteLimit = ctx.ReadLength();
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+        {
+            throw InvalidException.RecursionLimitExceeded();
+        }
+        int oldLimit = ctx.PushLimit(byteLimit);
+        ctx.state.recursionDepth++;
+        DeleteEntriesFrom(ref ctx, codec);
+        if (!ctx.ReachedLimit)
+        {
+            throw InvalidException.TruncatedMessage();
+        }
+
+        ctx.state.recursionDepth--;
+        ctx.PopLimit(oldLimit);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void DeleteEntriesFrom(ref ParseContext ctx, Codec codec)
+    {
+        ValueReader<TKey> valueReader = codec.KeyCodec.ValueReader;
+        while (!ctx.ReachedLimit)
+        {
+            Remove(valueReader(ref ctx));
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MergeUpdateEntriesFrom(ref ParseContext ctx, Codec codec)
+    {
+        int byteLimit = ctx.ReadLength();
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+        {
+            throw InvalidException.RecursionLimitExceeded();
+        }
+        int oldLimit = ctx.PushLimit(byteLimit);
+        ctx.state.recursionDepth++;
+        UpdateEntriesFrom(ref ctx, codec);
+        if (!ctx.ReachedLimit)
+        {
+            throw InvalidException.TruncatedMessage();
+        }
+
+        ctx.state.recursionDepth--;
+        ctx.PopLimit(oldLimit);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void UpdateEntriesFrom(ref ParseContext ctx, Codec codec)
     {
         TKey key = codec.KeyCodec.DefaultValue;
-        // TValue val = codec.ValueCodec.DefaultValue;
+        ParserInternalState? valueState = null;
 
-        ParseContext.Initialize(new ReadOnlySequence<byte>(new byte[1]), out var valCtx);
         uint tag;
         while ((tag = ctx.ReadTag()) != 0)
         {
@@ -543,8 +580,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             }
             else if (num == codec.ValueCodec.Tag)
             {
-                valCtx.buffer = ctx.buffer;
-                valCtx.state = ctx.state;
+                valueState = ctx.state;
                 ctx.SkipLastField();
             }
             else
@@ -558,20 +594,30 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         {
             throw InvalidException.TruncatedMessage();
         }
-        if (TryGetValue(key, out var value))
+
+        if (valueState.HasValue)
         {
-            if (typeof(TValue) is IMessage)
-            {
-                codec.ValueCodec.ValueMerger(ref valCtx, ref value);
-            }
-            else
-            {
-                this[key] = codec.ValueCodec.Read(ref valCtx);
-            }
+            var valueStateValue = valueState.Value;
+            ParseContext.Initialize(ctx.buffer, ref valueStateValue, out var valueCtx);
+            UpdateValueFrom(ref valueCtx, key, codec);
         }
         else
         {
-            this[key] = codec.ValueCodec.Read(ref valCtx);
+            ParseContext.Initialize(ParsingPrimitivesMessages.ZeroLengthMessageStreamData, out var valueCtx);
+            UpdateValueFrom(ref valueCtx, key, codec);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void UpdateValueFrom(ref ParseContext ctx, TKey key, Codec codec)
+    {
+        if ((typeof(TValue) is IMessage) && TryGetValue(key, out var value))
+        {
+            codec.ValueCodec.ValueMerger(ref ctx, ref value);
+        }
+        else
+        {
+            this[key] = codec.ValueCodec.Read(ref ctx);
         }
     }
 

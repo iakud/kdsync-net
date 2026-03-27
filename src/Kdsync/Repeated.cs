@@ -86,7 +86,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
         }
     }
 
-    public void AddEntriesFrom(ref ParseContext ctx, FieldCodec<T> codec)
+    public void MergeFrom(ref ParseContext ctx, FieldCodec<T> codec)
     {
         int byteLimit = ctx.ReadLength();
         if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
@@ -95,7 +95,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
         }
         int oldLimit = ctx.PushLimit(byteLimit);
         ctx.state.recursionDepth++;
-        MergeFrom(ref ctx, codec);
+        MergeEntriesFrom(ref ctx, codec);
         if (!ctx.ReachedLimit)
         {
             throw InvalidException.TruncatedMessage();
@@ -105,7 +105,7 @@ public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnu
         ctx.PopLimit(oldLimit);
     }
 
-    public void MergeFrom(ref ParseContext ctx, FieldCodec<T> codec)
+    private void MergeEntriesFrom(ref ParseContext ctx, FieldCodec<T> codec)
     {
         Clear();
         ValueReader<T> valueReader = codec.ValueReader;
