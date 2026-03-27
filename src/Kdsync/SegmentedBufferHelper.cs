@@ -11,6 +11,8 @@ internal struct SegmentedBufferHelper
 
     private ReadOnlySequence<byte>.Enumerator readOnlySequenceEnumerator;
 
+    public ReadOnlyMemory<byte> Buffer => readOnlySequenceEnumerator.Current;
+
     public int? TotalLength => totalLength;
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

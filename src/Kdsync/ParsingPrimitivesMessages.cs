@@ -94,60 +94,73 @@ internal static class ParsingPrimitivesMessages
         ctx.state.recursionDepth--;
         SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
     }
-    /*
-        public static KeyValuePair<TKey, TValue> ReadMapEntry<TKey, TValue>(ref ParseContext ctx, MapField<TKey, TValue>.Codec codec)
+
+    public static IEnumerable<TKey> ReadMapDeleteKeys<TKey, TValue>(ref ParseContext ctx, Map<TKey, TValue>.Codec codec)
+    {
+        int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
         {
-            int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-            if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
-            {
-                throw InvalidProtocolBufferException.RecursionLimitExceeded();
-            }
-
-            int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
-            ctx.state.recursionDepth++;
-            TKey key = codec.KeyCodec.DefaultValue;
-            TValue val = codec.ValueCodec.DefaultValue;
-            uint num;
-            while ((num = ctx.ReadTag()) != 0)
-            {
-                if (num == codec.KeyCodec.Tag)
-                {
-                    key = codec.KeyCodec.Read(ref ctx);
-                }
-                else if (num == codec.ValueCodec.Tag)
-                {
-                    val = codec.ValueCodec.Read(ref ctx);
-                }
-                else
-                {
-                    SkipLastField(ref ctx.buffer, ref ctx.state);
-                }
-            }
-
-            if (val == null)
-            {
-                if (ctx.state.CodedInputStream != null)
-                {
-                    val = codec.ValueCodec.Read(new CodedInputStream(ZeroLengthMessageStreamData));
-                }
-                else
-                {
-                    ParseContext.Initialize(new ReadOnlySequence<byte>(ZeroLengthMessageStreamData), out var ctx2);
-                    val = codec.ValueCodec.Read(ref ctx2);
-                }
-            }
-
-            CheckReadEndOfStreamTag(ref ctx.state);
-            if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
-            {
-                throw InvalidProtocolBufferException.TruncatedMessage();
-            }
-
-            ctx.state.recursionDepth--;
-            SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
-            return new KeyValuePair<TKey, TValue>(key, val);
+            throw InvalidException.RecursionLimitExceeded();
         }
-    */
+
+        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
+        ctx.state.recursionDepth++;
+
+        List<TKey> keys = new List<TKey>();
+        ValueReader<TKey> valueReader = codec.KeyCodec.ValueReader;
+        while (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+        {
+            keys.Add(valueReader(ref ctx));
+        }
+
+        ctx.state.recursionDepth--;
+        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
+        return keys;
+    }
+
+    public static KeyValuePair<TKey, ReadOnlyMemory<byte>> ReadMapEntryMemory<TKey, TValue>(ref ParseContext ctx, Map<TKey, TValue>.Codec codec)
+    {
+        int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+        {
+            throw InvalidException.RecursionLimitExceeded();
+        }
+
+        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
+        ctx.state.recursionDepth++;
+
+        TKey key = codec.KeyCodec.DefaultValue;
+        ReadOnlyMemory<byte> val = ZeroLengthMessageStreamData;
+        uint tag;
+        while ((tag = ctx.ReadTag()) != 0)
+        {
+            int num = WireFormat.GetTagFieldNumber(tag);
+            if (num == Map<TKey, TValue>.KeyFieldNumber)
+            {
+                key = codec.KeyCodec.Read(ref ctx);
+            }
+            else if (num == Map<TKey, TValue>.ValueFieldNumber)
+            {
+                int size = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+                val = ctx.state.segmentedBufferHelper.Buffer.Slice(ctx.state.bufferPos, size);
+                ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, size);
+            }
+            else
+            {
+                ctx.SkipLastField();
+            }
+        }
+
+        CheckReadEndOfStreamTag(ref ctx.state);
+        if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
+        {
+            throw InvalidException.TruncatedMessage();
+        }
+
+        ctx.state.recursionDepth--;
+        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
+        return new KeyValuePair<TKey, ReadOnlyMemory<byte>>(key, val);
+    }
 
     public static void ReadRawMessage(ref ParseContext ctx, IMessage message)
     {

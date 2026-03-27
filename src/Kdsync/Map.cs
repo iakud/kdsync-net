@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections;
 using System.Runtime.CompilerServices;
 using System.Security;
@@ -476,8 +475,8 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     private void MergeEntriesFrom(ref ParseContext ctx, Codec codec)
     {
         var clear = false;
-        ParserInternalState? deleteState = null;
-        ParserInternalState? updateState = null;
+        IEnumerable<TKey> deleteKeys = Enumerable.Empty<TKey>();
+        KeyValuePair<TKey, ReadOnlyMemory<byte>>[] entries = Array.Empty<KeyValuePair<TKey, ReadOnlyMemory<byte>>>();
         uint tag;
         while ((tag = ctx.ReadTag()) != 0)
         {
@@ -488,12 +487,11 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                     clear = ctx.ReadBool();
                     break;
                 case DeletesFieldNumber:
-                    deleteState = ctx.state;
+                    deleteKeys = ParsingPrimitivesMessages.ReadMapDeleteKeys(ref ctx, codec);
                     ctx.SkipLastField();
                     break;
                 case EntriesFieldNumber:
-                    updateState = ctx.state;
-                    ctx.SkipLastField();
+                    entries.Append(ParsingPrimitivesMessages.ReadMapEntryMemory(ref ctx, codec));
                     break;
                 default:
                     ctx.SkipLastField();
@@ -504,116 +502,19 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         {
             Clear();
         }
-        if (deleteState.HasValue)
+        foreach (var deleteKey in deleteKeys)
         {
-            var deleteStateValue = deleteState.Value;
-            ParseContext.Initialize(ctx.buffer, ref deleteStateValue, out var deleteCtx);
-            MergeDeleteEntriesFrom(ref deleteCtx, codec);
+            Remove(deleteKey);
         }
-        if (updateState.HasValue)
+        foreach (KeyValuePair<TKey, ReadOnlyMemory<byte>> entry in entries)
         {
-            var updateStateValue = updateState.Value;
-            ParseContext.Initialize(ctx.buffer, ref updateStateValue, out var updateCtx);
-            MergeUpdateEntriesFrom(ref updateCtx, codec);
+            ParseContext.Initialize(entry.Value.Span, out var entryCtx);
+            UpdateEntriesFrom(ref entryCtx, entry.Key, codec);
         }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void MergeDeleteEntriesFrom(ref ParseContext ctx, Codec codec)
-    {
-        int byteLimit = ctx.ReadLength();
-        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
-        {
-            throw InvalidException.RecursionLimitExceeded();
-        }
-        int oldLimit = ctx.PushLimit(byteLimit);
-        ctx.state.recursionDepth++;
-        DeleteEntriesFrom(ref ctx, codec);
-        if (!ctx.ReachedLimit)
-        {
-            throw InvalidException.TruncatedMessage();
-        }
-
-        ctx.state.recursionDepth--;
-        ctx.PopLimit(oldLimit);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void DeleteEntriesFrom(ref ParseContext ctx, Codec codec)
-    {
-        ValueReader<TKey> valueReader = codec.KeyCodec.ValueReader;
-        while (!ctx.ReachedLimit)
-        {
-            Remove(valueReader(ref ctx));
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void MergeUpdateEntriesFrom(ref ParseContext ctx, Codec codec)
-    {
-        int byteLimit = ctx.ReadLength();
-        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
-        {
-            throw InvalidException.RecursionLimitExceeded();
-        }
-        int oldLimit = ctx.PushLimit(byteLimit);
-        ctx.state.recursionDepth++;
-        UpdateEntriesFrom(ref ctx, codec);
-        if (!ctx.ReachedLimit)
-        {
-            throw InvalidException.TruncatedMessage();
-        }
-
-        ctx.state.recursionDepth--;
-        ctx.PopLimit(oldLimit);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void UpdateEntriesFrom(ref ParseContext ctx, Codec codec)
-    {
-        TKey key = codec.KeyCodec.DefaultValue;
-        ParserInternalState? valueState = null;
-
-        uint tag;
-        while ((tag = ctx.ReadTag()) != 0)
-        {
-            int num = WireFormat.GetTagFieldNumber(tag);
-            if (num == KeyFieldNumber)
-            {
-                key = codec.KeyCodec.Read(ref ctx);
-            }
-            else if (num == ValueFieldNumber)
-            {
-                valueState = ctx.state;
-                ctx.SkipLastField();
-            }
-            else
-            {
-                ctx.SkipLastField();
-            }
-        }
-
-        ctx.CheckReadEndOfStreamTag();
-        if (!ctx.ReachedLimit)
-        {
-            throw InvalidException.TruncatedMessage();
-        }
-
-        if (valueState.HasValue)
-        {
-            var valueStateValue = valueState.Value;
-            ParseContext.Initialize(ctx.buffer, ref valueStateValue, out var valueCtx);
-            UpdateValueFrom(ref valueCtx, key, codec);
-        }
-        else
-        {
-            ParseContext.Initialize(ParsingPrimitivesMessages.ZeroLengthMessageStreamData, out var valueCtx);
-            UpdateValueFrom(ref valueCtx, key, codec);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void UpdateValueFrom(ref ParseContext ctx, TKey key, Codec codec)
+    private void UpdateEntriesFrom(ref ParseContext ctx, TKey key, Codec codec)
     {
         if ((typeof(TValue) is IMessage) && TryGetValue(key, out var value))
         {
