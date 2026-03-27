@@ -466,7 +466,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                     break;
                 case DeletesFieldNumber:
                     deleteKeys = ParsingPrimitivesMessages.ReadMapDeleteKeys(ref ctx, codec);
-                    ctx.SkipLastField();
                     break;
                 case EntriesFieldNumber:
                     entries.Append(ParsingPrimitivesMessages.ReadMapEntryMemory(ref ctx, codec));
