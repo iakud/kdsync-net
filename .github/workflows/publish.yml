@@ -17,7 +17,7 @@ jobs:
         env:
           NUGET_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Pack
-        run: dotnet pack build.csproj
+        run: dotnet pack src/kdsync-net/kdsync-net.csproj
       # - name: Push to NuGet.org
       #   run: dotnet nuget push **/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source "https://api.nuget.org/v3/index.json"
       - name: Push to GitHub Packages

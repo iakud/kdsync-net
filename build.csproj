@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.Build.Traversal/2.0.19">
-
-  <ItemGroup>
-    <ProjectReference Include="src\kdsync-net\*.csproj" />
-  </ItemGroup>
-
-</Project>
