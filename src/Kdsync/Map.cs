@@ -454,7 +454,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
         var clear = false;
         IEnumerable<TKey> deleteKeys = Enumerable.Empty<TKey>();
-        ValueTuple<int, int>[] entries = Array.Empty<ValueTuple<int, int>>();
+        List<ValueTuple<int, int>> entries = new List<ValueTuple<int, int>>();
         uint tag;
         while ((tag = ctx.ReadTag()) != 0)
         {
@@ -469,7 +469,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                     break;
                 case EntriesFieldNumber:
                     int size = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-                    entries.Append((ctx.state.bufferPos, size));
+                    entries.Add((ctx.state.bufferPos, size));
                     ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, size);
                     break;
                 default:
@@ -487,7 +487,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             Remove(deleteKey);
             _deletes.Add(deleteKey);
         }
-        foreach (ref ValueTuple<int, int> entry in entries.AsSpan())
+        foreach (ref ValueTuple<int, int> entry in entries.ToArray().AsSpan())
         {
             ParseContext.Initialize(ctx.buffer.Slice(entry.Item1, entry.Item2), out var entryCtx);
             if (typeof(TValue) is IMessage)

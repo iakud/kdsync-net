@@ -26,7 +26,7 @@ public ref struct ParseContext
         {
             sizeLimit = int.MaxValue,
             recursionLimit = 100,
-            currentLimit = int.MaxValue,
+            currentLimit = buffer.Length,
             bufferSize = buffer.Length
         };
         ctx.buffer = buffer;
@@ -38,27 +38,6 @@ public ref struct ParseContext
     {
         ctx.buffer = buffer;
         ctx.state = state;
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void Initialize(ReadOnlySequence<byte> input, out ParseContext ctx)
-    {
-        Initialize(input, 100, out ctx);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static void Initialize(ReadOnlySequence<byte> input, int recursionLimit, out ParseContext ctx)
-    {
-        ctx.buffer = default(ReadOnlySpan<byte>);
-        ctx.state = default(ParserInternalState);
-        ctx.state.lastTag = 0u;
-        ctx.state.recursionDepth = 0;
-        ctx.state.sizeLimit = int.MaxValue;
-        ctx.state.recursionLimit = recursionLimit;
-        ctx.state.currentLimit = int.MaxValue;
-        SegmentedBufferHelper.Initialize(input, out ctx.state.segmentedBufferHelper, out ctx.buffer);
-        ctx.state.bufferPos = 0;
-        ctx.state.bufferSize = ctx.buffer.Length;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
