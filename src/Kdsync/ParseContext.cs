@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Security;
 
@@ -24,7 +23,6 @@ public ref struct ParseContext
     {
         ParserInternalState parserInternalState = new ParserInternalState
         {
-            sizeLimit = int.MaxValue,
             recursionLimit = 100,
             currentLimit = buffer.Length,
             bufferSize = buffer.Length

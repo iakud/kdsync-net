@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -29,7 +28,7 @@ internal static class ParsingPrimitives
             return state.lastTag;
         }
 
-        if (state.bufferPos + 2 <= state.bufferSize)
+        if (state.bufferPos + 2 <= state.currentLimit)
         {
             int num = buffer[state.bufferPos++];
             if (num < 128)
@@ -53,7 +52,7 @@ internal static class ParsingPrimitives
         }
         else
         {
-            if (SegmentedBufferHelper.IsAtEnd(ref buffer, ref state))
+            if (SegmentedBufferHelper.IsReachedLimit(ref state))
             {
                 state.lastTag = 0u;
                 return 0u;
@@ -97,7 +96,7 @@ internal static class ParsingPrimitives
 
     public static ulong ParseRawVarint64(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
-        if (state.bufferPos + 10 > state.bufferSize)
+        if (state.bufferPos + 10 > state.currentLimit)
         {
             return ParseRawVarint64SlowPath(ref buffer, ref state);
         }
@@ -146,7 +145,7 @@ internal static class ParsingPrimitives
 
     public static uint ParseRawVarint32(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
-        if (state.bufferPos + 5 > state.bufferSize)
+        if (state.bufferPos + 5 > state.currentLimit)
         {
             return ParseRawVarint32SlowPath(ref buffer, ref state);
         }
@@ -251,7 +250,7 @@ internal static class ParsingPrimitives
 
     public static uint ParseRawLittleEndian32(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
-        if (state.bufferPos + 8 > state.bufferSize)
+        if (state.bufferPos + 8 > state.currentLimit)
         {
             return ParseRawLittleEndian32SlowPath(ref buffer, ref state);
         }
@@ -272,7 +271,7 @@ internal static class ParsingPrimitives
 
     public static ulong ParseRawLittleEndian64(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
-        if (state.bufferPos + 8 > state.bufferSize)
+        if (state.bufferPos + 8 > state.currentLimit)
         {
             return ParseRawLittleEndian64SlowPath(ref buffer, ref state);
         }
@@ -297,7 +296,7 @@ internal static class ParsingPrimitives
 
     public static double ParseDouble(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
-        if (!BitConverter.IsLittleEndian || state.bufferPos + 8 > state.bufferSize)
+        if (!BitConverter.IsLittleEndian || state.bufferPos + 8 > state.currentLimit)
         {
             return BitConverter.Int64BitsToDouble((long)ParseRawLittleEndian64(ref buffer, ref state));
         }
@@ -309,7 +308,7 @@ internal static class ParsingPrimitives
 
     public static float ParseFloat(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
-        if (!BitConverter.IsLittleEndian || state.bufferPos + 4 > state.bufferSize)
+        if (!BitConverter.IsLittleEndian || state.bufferPos + 4 > state.currentLimit)
         {
             return ParseFloatSlow(ref buffer, ref state);
         }
@@ -342,54 +341,11 @@ internal static class ParsingPrimitives
         {
             throw InvalidException.NegativeSize();
         }
-
-        if (size <= state.bufferSize - state.bufferPos)
-        {
-            byte[] array = new byte[size];
-            buffer.Slice(state.bufferPos, size).CopyTo(array);
-            state.bufferPos += size;
-            return array;
-        }
-
-        return ReadRawBytesSlow(ref buffer, ref state, size);
-    }
-
-    private static byte[] ReadRawBytesSlow(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, int size)
-    {
         ValidateCurrentLimit(ref buffer, ref state, size);
-        if ((!state.segmentedBufferHelper.TotalLength.HasValue && size < buffer.Length) || IsDataAvailableInSource(ref state, size))
-        {
-            byte[] array = new byte[size];
-            ReadRawBytesIntoSpan(ref buffer, ref state, size, array);
-            return array;
-        }
-
-        Repeated<byte[]> list = new Repeated<byte[]>();
-        int num = state.bufferSize - state.bufferPos;
-        byte[] array2 = new byte[num];
-        buffer.Slice(state.bufferPos, num).CopyTo(array2);
-        list.Add(array2);
-        state.bufferPos = state.bufferSize;
-        int num2 = size - num;
-        while (num2 > 0)
-        {
-            state.segmentedBufferHelper.RefillBuffer(ref buffer, ref state, mustSucceed: true);
-            byte[] array3 = new byte[Math.Min(num2, state.bufferSize)];
-            buffer.Slice(0, array3.Length).CopyTo(array3);
-            state.bufferPos += array3.Length;
-            num2 -= array3.Length;
-            list.Add(array3);
-        }
-
-        byte[] array4 = new byte[size];
-        int num3 = 0;
-        foreach (byte[] item in list)
-        {
-            Buffer.BlockCopy(item, 0, array4, num3, item.Length);
-            num3 += item.Length;
-        }
-
-        return array4;
+        byte[] array = new byte[size];
+        buffer.Slice(state.bufferPos, size).CopyTo(array);
+        state.bufferPos += size;
+        return array;
     }
 
     public static void SkipRawBytes(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, int size)
@@ -400,23 +356,7 @@ internal static class ParsingPrimitives
         }
 
         ValidateCurrentLimit(ref buffer, ref state, size);
-        if (size <= state.bufferSize - state.bufferPos)
-        {
-            state.bufferPos += size;
-            return;
-        }
-
-        int num = state.bufferSize - state.bufferPos;
-        state.bufferPos = state.bufferSize;
-        state.segmentedBufferHelper.RefillBuffer(ref buffer, ref state, mustSucceed: true);
-        while (size - num > state.bufferSize)
-        {
-            num += state.bufferSize;
-            state.bufferPos = state.bufferSize;
-            state.segmentedBufferHelper.RefillBuffer(ref buffer, ref state, mustSucceed: true);
-        }
-
-        state.bufferPos = size - num;
+        state.bufferPos += size;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -446,77 +386,28 @@ internal static class ParsingPrimitives
             throw InvalidException.NegativeSize();
         }
 
-        if (length <= state.bufferSize - state.bufferPos)
-        {
-            string result;
-            fixed (byte* reference = &MemoryMarshal.GetReference(buffer.Slice(state.bufferPos, length)))
-            {
-                try
-                {
-                    result = Utf8Encoding.GetString(reference, length);
-                }
-                catch (DecoderFallbackException innerException)
-                {
-                    throw InvalidException.InvalidUtf8(innerException);
-                }
-            }
-
-            state.bufferPos += length;
-            return result;
-        }
-
-        return ReadStringSlow(ref buffer, ref state, length);
-    }
-
-    private unsafe static string ReadStringSlow(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, int length)
-    {
         ValidateCurrentLimit(ref buffer, ref state, length);
-        if (IsDataAvailable(ref state, length))
+
+        string result;
+        fixed (byte* reference = &MemoryMarshal.GetReference(buffer.Slice(state.bufferPos, length)))
         {
-            byte[] array = null;
-            Span<byte> span = ((length > 256) ? ((Span<byte>)(array = ArrayPool<byte>.Shared.Rent(length))) : stackalloc byte[length]);
-            Span<byte> span2 = span;
             try
             {
-                fixed (byte* reference = &MemoryMarshal.GetReference(span2))
-                {
-                    Span<byte> byteSpan = new Span<byte>(reference, span2.Length);
-                    ReadRawBytesIntoSpan(ref buffer, ref state, length, byteSpan);
-                    try
-                    {
-                        return Utf8Encoding.GetString(reference, length);
-                    }
-                    catch (DecoderFallbackException innerException)
-                    {
-                        throw InvalidException.InvalidUtf8(innerException);
-                    }
-                }
+                result = Utf8Encoding.GetString(reference, length);
             }
-            finally
+            catch (DecoderFallbackException innerException)
             {
-                if (array != null)
-                {
-                    ArrayPool<byte>.Shared.Return(array);
-                }
+                throw InvalidException.InvalidUtf8(innerException);
             }
         }
-
-        byte[] bytes = ReadRawBytes(ref buffer, ref state, length);
-        try
-        {
-            return Utf8Encoding.GetString(bytes, 0, length);
-        }
-        catch (DecoderFallbackException innerException2)
-        {
-            throw InvalidException.InvalidUtf8(innerException2);
-        }
+        state.bufferPos += length;
+        return result;
     }
 
     private static void ValidateCurrentLimit(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, int size)
     {
-        if (state.totalBytesRetired + state.bufferPos + size > state.currentLimit)
+        if (state.bufferPos + size > state.currentLimit)
         {
-            SkipRawBytes(ref buffer, ref state, state.currentLimit - state.totalBytesRetired - state.bufferPos);
             throw InvalidException.TruncatedMessage();
         }
     }
@@ -524,11 +415,6 @@ internal static class ParsingPrimitives
     [SecuritySafeCritical]
     private static byte ReadRawByte(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state)
     {
-        if (state.bufferPos == state.bufferSize)
-        {
-            state.segmentedBufferHelper.RefillBuffer(ref buffer, ref state, mustSucceed: true);
-        }
-
         return buffer[state.bufferPos++];
     }
 
@@ -576,50 +462,5 @@ internal static class ParsingPrimitives
     public static long DecodeZigZag64(ulong n)
     {
         return (long)((n >> 1) ^ (0L - (n & 1)));
-    }
-
-    public static bool IsDataAvailable(ref ParserInternalState state, int size)
-    {
-        if (size <= state.bufferSize - state.bufferPos)
-        {
-            return true;
-        }
-
-        return IsDataAvailableInSource(ref state, size);
-    }
-
-    private static bool IsDataAvailableInSource(ref ParserInternalState state, int size)
-    {
-        return size <= state.segmentedBufferHelper.TotalLength - state.totalBytesRetired - state.bufferPos;
-    }
-
-    private static void ReadRawBytesIntoSpan(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, int length, Span<byte> byteSpan)
-    {
-        int num = length;
-        while (num > 0)
-        {
-            if (state.bufferSize - state.bufferPos == 0)
-            {
-                state.segmentedBufferHelper.RefillBuffer(ref buffer, ref state, mustSucceed: true);
-            }
-
-            ReadOnlySpan<byte> readOnlySpan = buffer.Slice(state.bufferPos, Math.Min(num, state.bufferSize - state.bufferPos));
-            readOnlySpan.CopyTo(byteSpan.Slice(length - num));
-            num -= readOnlySpan.Length;
-            state.bufferPos += readOnlySpan.Length;
-        }
-    }
-
-    internal static void ReadPackedFieldLittleEndian(ref ReadOnlySpan<byte> buffer, ref ParserInternalState state, int length, Span<byte> outBuffer)
-    {
-        if (length <= state.bufferSize - state.bufferPos)
-        {
-            buffer.Slice(state.bufferPos, length).CopyTo(outBuffer);
-            state.bufferPos += length;
-        }
-        else
-        {
-            ReadRawBytesIntoSpan(ref buffer, ref state, length, outBuffer);
-        }
     }
 }
