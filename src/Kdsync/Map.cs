@@ -191,7 +191,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     private readonly HashSet<TKey> _deletes = new HashSet<TKey>(KeyEqualityComparer);
 
-    private readonly Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>> _updates = new Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>>(KeyEqualityComparer);
+    private readonly HashSet<TKey> _updates = new HashSet<TKey>(KeyEqualityComparer);
 
     public event Action<Map<TKey, TValue>, ChangedEvent>? OnChanged;
 
@@ -219,15 +219,11 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             if (map.TryGetValue(key, out var value3))
             {
                 value3.Value = value2;
-                _updates[key] = value3;
-                _deletes.Remove(key);
                 return;
             }
 
             value3 = list.AddLast(value2);
             map[key] = value3;
-            _updates[key] = value3;
-            _deletes.Remove(key);
         }
     }
 
@@ -300,8 +296,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         {
             map.Remove(key);
             value.List.Remove(value);
-            _updates.Remove(key);
-            _deletes.Add(key);
             return true;
         }
 
@@ -357,9 +351,6 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
     {
         list.Clear();
         map.Clear();
-        _updates.Clear();
-        _deletes.Clear();
-        _clear = true;
     }
 
     bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item)
@@ -460,20 +451,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
         int oldLimit = ctx.PushLimit(byteLimit);
         ctx.state.recursionDepth++;
-        MergeEntriesFrom(ref ctx, codec);
-        ctx.CheckReadEndOfStreamTag();
-        if (!ctx.ReachedLimit)
-        {
-            throw InvalidException.TruncatedMessage();
-        }
 
-        ctx.state.recursionDepth--;
-        ctx.PopLimit(oldLimit);
-    }
-
-    [SecuritySafeCritical]
-    private void MergeEntriesFrom(ref ParseContext ctx, Codec codec)
-    {
         var clear = false;
         IEnumerable<TKey> deleteKeys = Enumerable.Empty<TKey>();
         KeyValuePair<TKey, ReadOnlyMemory<byte>>[] entries = Array.Empty<KeyValuePair<TKey, ReadOnlyMemory<byte>>>();
@@ -501,36 +479,42 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         if (clear)
         {
             Clear();
+            _clear = true;
         }
         foreach (var deleteKey in deleteKeys)
         {
             Remove(deleteKey);
+            _deletes.Add(deleteKey);
         }
         foreach (KeyValuePair<TKey, ReadOnlyMemory<byte>> entry in entries)
         {
             ParseContext.Initialize(entry.Value.Span, out var entryCtx);
-            UpdateEntriesFrom(ref entryCtx, entry.Key, codec);
+            if ((typeof(TValue) is IMessage) && TryGetValue(entry.Key, out var value))
+            {
+                codec.ValueCodec.ValueMerger(ref entryCtx, ref value);
+            }
+            else
+            {
+                this[entry.Key] = codec.ValueCodec.Read(ref entryCtx);
+            }
+            _updates.Add(entry.Key);
         }
-    }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void UpdateEntriesFrom(ref ParseContext ctx, TKey key, Codec codec)
-    {
-        if ((typeof(TValue) is IMessage) && TryGetValue(key, out var value))
+        ctx.CheckReadEndOfStreamTag();
+        if (!ctx.ReachedLimit)
         {
-            codec.ValueCodec.ValueMerger(ref ctx, ref value);
+            throw InvalidException.TruncatedMessage();
         }
-        else
-        {
-            this[key] = codec.ValueCodec.Read(ref ctx);
-        }
+
+        ctx.state.recursionDepth--;
+        ctx.PopLimit(oldLimit);
     }
 
     public void RaiseChanged()
     {
         if (!_clear && _deletes.Count == 0 && _updates.Count == 0)
             return;
-        OnChanged?.Invoke(this, new ChangedEvent(_clear, _deletes, _updates.Keys));
+        OnChanged?.Invoke(this, new ChangedEvent(_clear, _deletes, _updates));
     }
 
     public void ClearChanged()
