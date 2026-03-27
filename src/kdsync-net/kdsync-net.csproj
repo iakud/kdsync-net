@@ -7,10 +7,10 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
 
-    <PackageId>kdsync-net</PackageId>
-    <Version>1.0.1</Version>
+    <PackageId>Kdsync</PackageId>
+    <Version>1.0.0</Version>
     <Authors>iakud</Authors>
-    <Description>kdsync library</Description>
+    <Description>Kdsync library</Description>
     <RepositoryUrl>https://github.com/iakud/kdsync-net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>kdsync</PackageTags>
