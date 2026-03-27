@@ -454,7 +454,7 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
         var clear = false;
         IEnumerable<TKey> deleteKeys = Enumerable.Empty<TKey>();
-        KeyValuePair<TKey, ReadOnlyMemory<byte>>[] entries = Array.Empty<KeyValuePair<TKey, ReadOnlyMemory<byte>>>();
+        ValueTuple<int, int>[] entries = Array.Empty<ValueTuple<int, int>>();
         uint tag;
         while ((tag = ctx.ReadTag()) != 0)
         {
@@ -468,7 +468,9 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
                     deleteKeys = ParsingPrimitivesMessages.ReadMapDeleteKeys(ref ctx, codec);
                     break;
                 case EntriesFieldNumber:
-                    entries.Append(ParsingPrimitivesMessages.ReadMapEntryMemory(ref ctx, codec));
+                    int size = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+                    entries.Append((ctx.state.bufferPos, size));
+                    ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, size);
                     break;
                 default:
                     ctx.SkipLastField();
@@ -485,18 +487,17 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
             Remove(deleteKey);
             _deletes.Add(deleteKey);
         }
-        foreach (KeyValuePair<TKey, ReadOnlyMemory<byte>> entry in entries)
+        foreach (ref ValueTuple<int, int> entry in entries.AsSpan())
         {
-            ParseContext.Initialize(entry.Value.Span, out var entryCtx);
-            if ((typeof(TValue) is IMessage) && TryGetValue(entry.Key, out var value))
+            ParseContext.Initialize(ctx.buffer.Slice(entry.Item1, entry.Item2), out var entryCtx);
+            if (typeof(TValue) is IMessage)
             {
-                codec.ValueCodec.ValueMerger(ref entryCtx, ref value);
+                MergeMessageEntriesFrom(ref entryCtx, codec);
             }
             else
             {
-                this[entry.Key] = codec.ValueCodec.Read(ref entryCtx);
+                MergeEntriesFrom(ref entryCtx, codec);
             }
-            _updates.Add(entry.Key);
         }
 
         ctx.CheckReadEndOfStreamTag();
@@ -507,6 +508,82 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
         ctx.state.recursionDepth--;
         ctx.PopLimit(oldLimit);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MergeMessageEntriesFrom(ref ParseContext ctx, Codec codec)
+    {
+        TKey key = codec.KeyCodec.DefaultValue;
+        ReadOnlySpan<byte> valSpan = ParsingPrimitivesMessages.ZeroLengthMessageStreamData;
+        uint tag;
+        while ((tag = ctx.ReadTag()) != 0)
+        {
+            int num = WireFormat.GetTagFieldNumber(tag);
+            if (num == KeyFieldNumber)
+            {
+                key = codec.KeyCodec.Read(ref ctx);
+            }
+            else if (num == ValueFieldNumber)
+            {
+                int size = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
+                valSpan = ctx.buffer.Slice(ctx.state.bufferPos, size);
+                ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, size);
+            }
+            else
+            {
+                ctx.SkipLastField();
+            }
+        }
+
+        ParseContext.Initialize(valSpan, out var valueCtx);
+        if (TryGetValue(key, out var value))
+        {
+            codec.ValueCodec.ValueMerger(ref valueCtx, ref value);
+        }
+        else
+        {
+            this[key] = codec.ValueCodec.Read(ref valueCtx);
+        }
+        _updates.Add(key);
+
+        ctx.CheckReadEndOfStreamTag();
+        if (!ctx.ReachedLimit)
+        {
+            throw InvalidException.TruncatedMessage();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void MergeEntriesFrom(ref ParseContext ctx, Codec codec)
+    {
+        TKey key = codec.KeyCodec.DefaultValue;
+        TValue val = codec.ValueCodec.DefaultValue;
+        uint tag;
+        while ((tag = ctx.ReadTag()) != 0)
+        {
+            int num = WireFormat.GetTagFieldNumber(tag);
+            if (num == KeyFieldNumber)
+            {
+                key = codec.KeyCodec.Read(ref ctx);
+            }
+            else if (num == ValueFieldNumber)
+            {
+                val = codec.ValueCodec.Read(ref ctx);
+            }
+            else
+            {
+                ctx.SkipLastField();
+            }
+        }
+
+        this[key] = val;
+        _updates.Add(key);
+
+        ctx.CheckReadEndOfStreamTag();
+        if (!ctx.ReachedLimit)
+        {
+            throw InvalidException.TruncatedMessage();
+        }
     }
 
     public void RaiseChanged()

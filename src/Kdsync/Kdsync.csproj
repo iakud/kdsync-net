@@ -8,7 +8,7 @@
     <Nullable>enable</Nullable>
 
     <PackageId>Kdsync</PackageId>
-    <Version>1.0.3</Version>
+    <Version>1.0.4</Version>
     <Authors>iakud</Authors>
     <Description>Kdsync library</Description>
     <RepositoryUrl>https://github.com/iakud/kdsync-net</RepositoryUrl>

@@ -118,50 +118,6 @@ internal static class ParsingPrimitivesMessages
         return keys;
     }
 
-    public static KeyValuePair<TKey, ReadOnlyMemory<byte>> ReadMapEntryMemory<TKey, TValue>(ref ParseContext ctx, Map<TKey, TValue>.Codec codec)
-    {
-        int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
-        {
-            throw InvalidException.RecursionLimitExceeded();
-        }
-
-        int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
-        ctx.state.recursionDepth++;
-
-        TKey key = codec.KeyCodec.DefaultValue;
-        ReadOnlyMemory<byte> val = ZeroLengthMessageStreamData;
-        uint tag;
-        while ((tag = ctx.ReadTag()) != 0)
-        {
-            int num = WireFormat.GetTagFieldNumber(tag);
-            if (num == Map<TKey, TValue>.KeyFieldNumber)
-            {
-                key = codec.KeyCodec.Read(ref ctx);
-            }
-            else if (num == Map<TKey, TValue>.ValueFieldNumber)
-            {
-                int size = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-                val = ctx.state.segmentedBufferHelper.Buffer.Slice(ctx.state.bufferPos, size);
-                ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, size);
-            }
-            else
-            {
-                ctx.SkipLastField();
-            }
-        }
-
-        CheckReadEndOfStreamTag(ref ctx.state);
-        if (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
-        {
-            throw InvalidException.TruncatedMessage();
-        }
-
-        ctx.state.recursionDepth--;
-        SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
-        return new KeyValuePair<TKey, ReadOnlyMemory<byte>>(key, val);
-    }
-
     public static void ReadRawMessage(ref ParseContext ctx, IMessage message)
     {
         message.MergeFrom(ref ctx);
