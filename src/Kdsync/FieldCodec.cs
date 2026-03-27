@@ -14,10 +14,6 @@ public sealed class FieldCodec<T>
 
     internal InputMerger ValueMerger { get; }
 
-    internal uint Tag { get; }
-
-    internal uint EndTag { get; }
-
     internal T DefaultValue { get; }
 
     static FieldCodec()
@@ -32,25 +28,23 @@ public sealed class FieldCodec<T>
         }
     }
 
-    internal FieldCodec(ValueReader<T> reader, uint tag, T defaultValue)
+    internal FieldCodec(ValueReader<T> reader, T defaultValue)
         : this(reader, delegate (ref ParseContext ctx, ref T v)
         {
             v = reader(ref ctx);
-        }, tag, 0u, defaultValue)
+        }, defaultValue)
     {
     }
 
-    internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger, uint tag, uint endTag = 0u)
-        : this(reader, inputMerger, tag, endTag, DefaultDefault)
+    internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger)
+        : this(reader, inputMerger, DefaultDefault)
     {
     }
 
-    internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger, uint tag, uint endTag, T defaultValue)
+    internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger, T defaultValue)
     {
         ValueReader = reader;
         ValueMerger = inputMerger;
-        Tag = tag;
-        EndTag = endTag;
         DefaultValue = defaultValue;
     }
 
@@ -62,225 +56,225 @@ public sealed class FieldCodec<T>
 
 public static class FieldCodec
 {
-    public static FieldCodec<string> ForString(uint tag)
+    public static FieldCodec<string> ForString()
     {
-        return ForString(tag, "");
+        return ForString("");
     }
 
-    public static FieldCodec<bool> ForBool(uint tag)
+    public static FieldCodec<bool> ForBool()
     {
-        return ForBool(tag, defaultValue: false);
+        return ForBool(defaultValue: false);
     }
 
-    public static FieldCodec<int> ForInt32(uint tag)
+    public static FieldCodec<int> ForInt32()
     {
-        return ForInt32(tag, 0);
+        return ForInt32(0);
     }
 
-    public static FieldCodec<int> ForSInt32(uint tag)
+    public static FieldCodec<int> ForSInt32()
     {
-        return ForSInt32(tag, 0);
+        return ForSInt32(0);
     }
 
-    public static FieldCodec<uint> ForFixed32(uint tag)
+    public static FieldCodec<uint> ForFixed32()
     {
-        return ForFixed32(tag, 0u);
+        return ForFixed32(0u);
     }
 
-    public static FieldCodec<int> ForSFixed32(uint tag)
+    public static FieldCodec<int> ForSFixed32()
     {
-        return ForSFixed32(tag, 0);
+        return ForSFixed32(0);
     }
 
-    public static FieldCodec<uint> ForUInt32(uint tag)
+    public static FieldCodec<uint> ForUInt32()
     {
-        return ForUInt32(tag, 0u);
+        return ForUInt32(0u);
     }
 
-    public static FieldCodec<long> ForInt64(uint tag)
+    public static FieldCodec<long> ForInt64()
     {
-        return ForInt64(tag, 0L);
+        return ForInt64(0L);
     }
 
-    public static FieldCodec<long> ForSInt64(uint tag)
+    public static FieldCodec<long> ForSInt64()
     {
-        return ForSInt64(tag, 0L);
+        return ForSInt64(0L);
     }
 
-    public static FieldCodec<ulong> ForFixed64(uint tag)
+    public static FieldCodec<ulong> ForFixed64()
     {
-        return ForFixed64(tag, 0uL);
+        return ForFixed64(0uL);
     }
 
-    public static FieldCodec<long> ForSFixed64(uint tag)
+    public static FieldCodec<long> ForSFixed64()
     {
-        return ForSFixed64(tag, 0L);
+        return ForSFixed64(0L);
     }
 
-    public static FieldCodec<ulong> ForUInt64(uint tag)
+    public static FieldCodec<ulong> ForUInt64()
     {
-        return ForUInt64(tag, 0uL);
+        return ForUInt64(0uL);
     }
 
-    public static FieldCodec<float> ForFloat(uint tag)
+    public static FieldCodec<float> ForFloat()
     {
-        return ForFloat(tag, 0f);
+        return ForFloat(0f);
     }
 
-    public static FieldCodec<double> ForDouble(uint tag)
+    public static FieldCodec<double> ForDouble()
     {
-        return ForDouble(tag, 0.0);
+        return ForDouble(0.0);
     }
 
-    public static FieldCodec<Timestamp> ForTimestamp(uint tag)
+    public static FieldCodec<Timestamp> ForTimestamp()
     {
-        return ForTimestamp(tag, default);
+        return ForTimestamp(default);
     }
 
-    public static FieldCodec<Duration> ForDuration(uint tag)
+    public static FieldCodec<Duration> ForDuration()
     {
-        return ForDuration(tag, default);
+        return ForDuration(default);
     }
 
-    public static FieldCodec<Empty> ForEmpty(uint tag)
+    public static FieldCodec<Empty> ForEmpty()
     {
-        return ForEmpty(tag, default);
+        return ForEmpty(default);
     }
 
-    public static FieldCodec<T> ForEnum<T>(uint tag, Func<T, int> toInt32, Func<int, T> fromInt32)
+    public static FieldCodec<T> ForEnum<T>(Func<T, int> toInt32, Func<int, T> fromInt32)
     {
-        return ForEnum(tag, toInt32, fromInt32, default(T));
+        return ForEnum(toInt32, fromInt32, default(T));
     }
 
-    public static FieldCodec<string> ForString(uint tag, string defaultValue)
+    public static FieldCodec<string> ForString(string defaultValue)
     {
         return new FieldCodec<string>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadString();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<byte[]> ForBytes(uint tag, byte[] defaultValue)
+    public static FieldCodec<byte[]> ForBytes(byte[] defaultValue)
     {
         return new FieldCodec<byte[]>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadBytes();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<bool> ForBool(uint tag, bool defaultValue)
+    public static FieldCodec<bool> ForBool(bool defaultValue)
     {
         return new FieldCodec<bool>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadBool();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<int> ForInt32(uint tag, int defaultValue)
+    public static FieldCodec<int> ForInt32(int defaultValue)
     {
         return new FieldCodec<int>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadInt32();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<int> ForSInt32(uint tag, int defaultValue)
+    public static FieldCodec<int> ForSInt32(int defaultValue)
     {
         return new FieldCodec<int>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadSInt32();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<uint> ForFixed32(uint tag, uint defaultValue)
+    public static FieldCodec<uint> ForFixed32(uint defaultValue)
     {
         return new FieldCodec<uint>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadFixed32();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<int> ForSFixed32(uint tag, int defaultValue)
+    public static FieldCodec<int> ForSFixed32(int defaultValue)
     {
         return new FieldCodec<int>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadSFixed32();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<uint> ForUInt32(uint tag, uint defaultValue)
+    public static FieldCodec<uint> ForUInt32(uint defaultValue)
     {
         return new FieldCodec<uint>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadUInt32();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<long> ForInt64(uint tag, long defaultValue)
+    public static FieldCodec<long> ForInt64(long defaultValue)
     {
         return new FieldCodec<long>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadInt64();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<long> ForSInt64(uint tag, long defaultValue)
+    public static FieldCodec<long> ForSInt64(long defaultValue)
     {
         return new FieldCodec<long>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadSInt64();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<ulong> ForFixed64(uint tag, ulong defaultValue)
+    public static FieldCodec<ulong> ForFixed64(ulong defaultValue)
     {
         return new FieldCodec<ulong>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadFixed64();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<long> ForSFixed64(uint tag, long defaultValue)
+    public static FieldCodec<long> ForSFixed64(long defaultValue)
     {
         return new FieldCodec<long>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadSFixed64();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<ulong> ForUInt64(uint tag, ulong defaultValue)
+    public static FieldCodec<ulong> ForUInt64(ulong defaultValue)
     {
         return new FieldCodec<ulong>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadUInt64();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<float> ForFloat(uint tag, float defaultValue)
+    public static FieldCodec<float> ForFloat(float defaultValue)
     {
         return new FieldCodec<float>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadFloat();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<double> ForDouble(uint tag, double defaultValue)
+    public static FieldCodec<double> ForDouble(double defaultValue)
     {
         return new FieldCodec<double>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadDouble();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<T> ForEnum<T>(uint tag, Func<T, int> toInt32, Func<int, T> fromInt32, T defaultValue)
+    public static FieldCodec<T> ForEnum<T>(Func<T, int> toInt32, Func<int, T> fromInt32, T defaultValue)
     {
         return new FieldCodec<T>(delegate (ref ParseContext ctx)
         {
             return fromInt32(ctx.ReadEnum());
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<T> ForMessage<T>(uint tag) where T : class, IMessage, new()
+    public static FieldCodec<T> ForMessage<T>() where T : class, IMessage, new()
     {
         return new FieldCodec<T>(delegate (ref ParseContext ctx)
         {
@@ -297,30 +291,30 @@ public static class FieldCodec
             }
 
             ctx.ReadMessage(v);
-        }, tag);
+        });
     }
 
-    public static FieldCodec<Timestamp> ForTimestamp(uint tag, Timestamp defaultValue)
+    public static FieldCodec<Timestamp> ForTimestamp(Timestamp defaultValue)
     {
         return new FieldCodec<Timestamp>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadTimestamp();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<Duration> ForDuration(uint tag, Duration defaultValue)
+    public static FieldCodec<Duration> ForDuration(Duration defaultValue)
     {
         return new FieldCodec<Duration>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadDuration();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 
-    public static FieldCodec<Empty> ForEmpty(uint tag, Empty defaultValue)
+    public static FieldCodec<Empty> ForEmpty(Empty defaultValue)
     {
         return new FieldCodec<Empty>(delegate (ref ParseContext ctx)
         {
             return ctx.ReadEmpty();
-        }, tag, defaultValue);
+        }, defaultValue);
     }
 }

@@ -176,6 +176,10 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
 
     public const int EntriesFieldNumber = 3;
 
+    public const int KeyFieldNumber = 1;
+
+    public const int ValueFieldNumber = 2;
+
     private static readonly EqualityComparer<TValue> ValueEqualityComparer = EqualityComparers.GetEqualityComparer<TValue>();
 
     private static readonly EqualityComparer<TKey> KeyEqualityComparer = EqualityComparers.GetEqualityComparer<TKey>();
@@ -574,11 +578,11 @@ public sealed class Map<TKey, TValue> : IDictionary<TKey, TValue>, ICollection<K
         while ((tag = ctx.ReadTag()) != 0)
         {
             int num = WireFormat.GetTagFieldNumber(tag);
-            if (num == codec.KeyCodec.Tag)
+            if (num == KeyFieldNumber)
             {
                 key = codec.KeyCodec.Read(ref ctx);
             }
-            else if (num == codec.ValueCodec.Tag)
+            else if (num == ValueFieldNumber)
             {
                 valueState = ctx.state;
                 ctx.SkipLastField();
