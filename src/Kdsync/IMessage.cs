@@ -1,7 +1,10 @@
-namespace Kdsync;
+using System.Collections.Generic;
 
-public interface IMessage
+namespace Kdsync
 {
-    void MergeFrom(ref ParseContext ctx);
-    IEnumerable<KeyValuePair<string, object>> GetFields();
+    public interface IMessage
+    {
+        void MergeFrom(ref ParseContext ctx);
+        IEnumerable<KeyValuePair<string, object>> GetFields();
+    }
 }

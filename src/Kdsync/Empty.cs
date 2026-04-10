@@ -1,34 +1,32 @@
-namespace Kdsync;
+using System;
 
-public struct Empty : IEquatable<Empty>
+namespace Kdsync
 {
-    public override bool Equals(object other)
+    public struct Empty : IEquatable<Empty>
     {
-        return Equals(other is Empty);
-    }
+        public override bool Equals(object other)
+        {
+            return Equals(other is Empty);
+        }
 
-    public bool Equals(Empty other)
-    {
-        return true;
-    }
+        public bool Equals(Empty other)
+        {
+            return true;
+        }
 
-    public override int GetHashCode()
-    {
-        return 1;
-    }
+        public override int GetHashCode()
+        {
+            return 1;
+        }
 
-    public override string ToString()
-    {
-        return "{}";
-    }
+        public static bool operator ==(Empty a, Empty b)
+        {
+            return a.Equals(b);
+        }
 
-    public static bool operator ==(Empty a, Empty b)
-    {
-        return a.Equals(b);
-    }
-
-    public static bool operator !=(Empty a, Empty b)
-    {
-        return !(a == b);
+        public static bool operator !=(Empty a, Empty b)
+        {
+            return !(a == b);
+        }
     }
 }

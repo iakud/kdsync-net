@@ -1,20 +1,21 @@
-namespace Kdsync;
-
-internal struct ParserInternalState
+namespace Kdsync
 {
-    internal int bufferPos;
+    internal struct ParserInternalState
+    {
+        internal int bufferPos;
 
-    internal int bufferSize;
+        internal int bufferSize;
 
-    internal int currentLimit;
+        internal int currentLimit;
 
-    internal int recursionDepth;
+        internal int recursionDepth;
 
-    internal uint lastTag;
+        internal uint lastTag;
 
-    internal uint nextTag;
+        internal uint nextTag;
 
-    internal bool hasNextTag;
+        internal bool hasNextTag;
 
-    internal int recursionLimit;
+        internal int recursionLimit;
+    }
 }

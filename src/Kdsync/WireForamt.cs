@@ -1,33 +1,34 @@
-namespace Kdsync;
-
-public static class WireFormat
+namespace Kdsync
 {
-    public enum WireType : uint
+    public static class WireFormat
     {
-        Varint,
-        Fixed64,
-        LengthDelimited,
-        StartGroup,
-        EndGroup,
-        Fixed32
-    }
+        public enum WireType : uint
+        {
+            Varint,
+            Fixed64,
+            LengthDelimited,
+            StartGroup,
+            EndGroup,
+            Fixed32
+        }
 
-    private const int TagTypeBits = 3;
+        private const int TagTypeBits = 3;
 
-    private const uint TagTypeMask = 7u;
+        private const uint TagTypeMask = 7u;
 
-    public static WireType GetTagWireType(uint tag)
-    {
-        return (WireType)(tag & 7);
-    }
+        public static WireType GetTagWireType(uint tag)
+        {
+            return (WireType)(tag & 7);
+        }
 
-    public static int GetTagFieldNumber(uint tag)
-    {
-        return (int)(tag >> 3);
-    }
+        public static int GetTagFieldNumber(uint tag)
+        {
+            return (int)(tag >> 3);
+        }
 
-    public static uint MakeTag(int fieldNumber, WireType wireType)
-    {
-        return (uint)(fieldNumber << 3) | (uint)wireType;
+        public static uint MakeTag(int fieldNumber, WireType wireType)
+        {
+            return (uint)(fieldNumber << 3) | (uint)wireType;
+        }
     }
 }

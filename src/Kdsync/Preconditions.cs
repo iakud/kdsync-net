@@ -1,24 +1,27 @@
-namespace Kdsync;
+using System;
 
-public static class Preconditions
+namespace Kdsync
 {
-    public static T CheckNotNull<T>(T value, string name) where T : class
+    public static class Preconditions
     {
-        if (value == null)
+        public static T CheckNotNull<T>(T value, string name) where T : class
         {
-            throw new ArgumentNullException(name);
+            if (value == null)
+            {
+                throw new ArgumentNullException(name);
+            }
+
+            return value;
         }
 
-        return value;
-    }
-
-    internal static T CheckNotNullUnconstrained<T>(T value, string name)
-    {
-        if (value == null)
+        internal static T CheckNotNullUnconstrained<T>(T value, string name)
         {
-            throw new ArgumentNullException(name);
-        }
+            if (value == null)
+            {
+                throw new ArgumentNullException(name);
+            }
 
-        return value;
+            return value;
+        }
     }
 }

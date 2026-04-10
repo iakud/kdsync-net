@@ -1,421 +1,425 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security;
 
-namespace Kdsync;
-
-public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable, IList, ICollection, IEquatable<Repeated<T>>, IReadOnlyList<T>, IReadOnlyCollection<T>
+namespace Kdsync
 {
-    public class ChangedEvent
+    public sealed class Repeated<T> : IList<T>, ICollection<T>, IEnumerable<T>, IEnumerable, IList, ICollection, IEquatable<Repeated<T>>, IReadOnlyList<T>, IReadOnlyCollection<T>
     {
-    }
-
-    private static readonly EqualityComparer<T> EqualityComparer = EqualityComparers.GetEqualityComparer<T>();
-
-    private static readonly T[] EmptyArray = new T[0];
-
-    private const int MinArraySize = 8;
-
-    private T[] array = EmptyArray;
-
-    private int count;
-
-    public event Action<Repeated<T>, ChangedEvent>? OnChanged;
-
-    public int Capacity
-    {
-        get
+        public class ChangedEvent
         {
-            return array.Length;
         }
-        set
+
+        private static readonly EqualityComparer<T> EqualityComparer = EqualityComparers.GetEqualityComparer<T>();
+
+        private static readonly T[] EmptyArray = new T[0];
+
+        private const int MinArraySize = 8;
+
+        private T[] array = EmptyArray;
+
+        private int count;
+
+        public event Action<Repeated<T>, ChangedEvent>? OnChanged;
+
+        public int Capacity
         {
-            if (value < count)
+            get
             {
-                throw new ArgumentOutOfRangeException("Capacity", value, $"Cannot set Capacity to a value smaller than the current item count, {count}");
+                return array.Length;
+            }
+            set
+            {
+                if (value < count)
+                {
+                    throw new ArgumentOutOfRangeException("Capacity", value, $"Cannot set Capacity to a value smaller than the current item count, {count}");
+                }
+
+                if (value >= 0 && value != array.Length)
+                {
+                    SetSize(value);
+                }
+            }
+        }
+
+        public int Count => count;
+
+        public bool IsReadOnly => false;
+
+        public T this[int index]
+        {
+            get
+            {
+                if (index < 0 || index >= count)
+                {
+                    throw new ArgumentOutOfRangeException("index");
+                }
+
+                return array[index];
+            }
+            set
+            {
+                if (index < 0 || index >= count)
+                {
+                    throw new ArgumentOutOfRangeException("index");
+                }
+
+                array[index] = value;
+            }
+        }
+
+        bool IList.IsFixedSize => false;
+
+        bool ICollection.IsSynchronized => false;
+
+        object ICollection.SyncRoot => this;
+
+        object IList.this[int index]
+        {
+            get
+            {
+                return this[index];
+            }
+            set
+            {
+                this[index] = (T)value;
+            }
+        }
+
+        public void MergeFrom(ref ParseContext ctx, FieldCodec<T> codec)
+        {
+            int byteLimit = ctx.ReadLength();
+            if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
+            {
+                throw InvalidException.RecursionLimitExceeded();
+            }
+            int oldLimit = ctx.PushLimit(byteLimit);
+            ctx.state.recursionDepth++;
+            MergeEntriesFrom(ref ctx, codec);
+            if (!ctx.ReachedLimit)
+            {
+                throw InvalidException.TruncatedMessage();
             }
 
-            if (value >= 0 && value != array.Length)
+            ctx.state.recursionDepth--;
+            ctx.PopLimit(oldLimit);
+        }
+
+        private void MergeEntriesFrom(ref ParseContext ctx, FieldCodec<T> codec)
+        {
+            Clear();
+            ValueReader<T> valueReader = codec.ValueReader;
+            while (!ctx.ReachedLimit)
             {
-                SetSize(value);
+                Add(valueReader(ref ctx));
             }
         }
-    }
 
-    public int Count => count;
-
-    public bool IsReadOnly => false;
-
-    public T this[int index]
-    {
-        get
+        public void RaiseChanged()
         {
-            if (index < 0 || index >= count)
+            OnChanged?.Invoke(this, new ChangedEvent());
+        }
+
+        public void ClearChanged()
+        {
+
+        }
+
+        private void EnsureSize(int size)
+        {
+            if (array.Length < size)
             {
-                throw new ArgumentOutOfRangeException("index");
+                size = Math.Max(size, 8);
+                int size2 = Math.Max(array.Length * 2, size);
+                SetSize(size2);
+            }
+        }
+
+        private void SetSize(int size)
+        {
+            if (size != array.Length)
+            {
+                T[] destinationArray = new T[size];
+                Array.Copy(array, 0, destinationArray, 0, count);
+                array = destinationArray;
+            }
+        }
+
+        public void Add(T item)
+        {
+            EnsureSize(count + 1);
+            array[count++] = item;
+        }
+
+        public void Clear()
+        {
+            Array.Clear(array, 0, count);
+            count = 0;
+        }
+
+        public bool Contains(T item)
+        {
+            return IndexOf(item) != -1;
+        }
+
+        public void CopyTo(T[] array, int arrayIndex)
+        {
+            Array.Copy(this.array, 0, array, arrayIndex, count);
+        }
+
+        public bool Remove(T item)
+        {
+            int num = IndexOf(item);
+            if (num == -1)
+            {
+                return false;
             }
 
-            return array[index];
+            Array.Copy(array, num + 1, array, num, count - num - 1);
+            count--;
+            array[count] = default(T);
+            return true;
         }
-        set
+
+        public void AddRange(IEnumerable<T> values)
         {
-            if (index < 0 || index >= count)
+            Preconditions.CheckNotNull(values, "values");
+            if (values is Repeated<T> repeatedField)
             {
-                throw new ArgumentOutOfRangeException("index");
+                EnsureSize(count + repeatedField.count);
+                Array.Copy(repeatedField.array, 0, array, count, repeatedField.count);
+                count += repeatedField.count;
+                return;
             }
 
-            array[index] = value;
-        }
-    }
+            if (values is ICollection { Count: var num } collection)
+            {
+                if (default(T) == null)
+                {
+                    foreach (object item in collection)
+                    {
+                        if (item == null)
+                        {
+                            throw new ArgumentException("Sequence contained null element", "values");
+                        }
+                    }
+                }
 
-    bool IList.IsFixedSize => false;
+                EnsureSize(count + num);
+                collection.CopyTo(array, count);
+                count += num;
+                return;
+            }
 
-    bool ICollection.IsSynchronized => false;
-
-    object ICollection.SyncRoot => this;
-
-    object IList.this[int index]
-    {
-        get
-        {
-            return this[index];
-        }
-        set
-        {
-            this[index] = (T)value;
-        }
-    }
-
-    public void MergeFrom(ref ParseContext ctx, FieldCodec<T> codec)
-    {
-        int byteLimit = ctx.ReadLength();
-        if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
-        {
-            throw InvalidException.RecursionLimitExceeded();
-        }
-        int oldLimit = ctx.PushLimit(byteLimit);
-        ctx.state.recursionDepth++;
-        MergeEntriesFrom(ref ctx, codec);
-        if (!ctx.ReachedLimit)
-        {
-            throw InvalidException.TruncatedMessage();
+            foreach (T value in values)
+            {
+                Add(value);
+            }
         }
 
-        ctx.state.recursionDepth--;
-        ctx.PopLimit(oldLimit);
-    }
-
-    private void MergeEntriesFrom(ref ParseContext ctx, FieldCodec<T> codec)
-    {
-        Clear();
-        ValueReader<T> valueReader = codec.ValueReader;
-        while (!ctx.ReachedLimit)
+        [SecuritySafeCritical]
+        internal void AddRangeSpan(ReadOnlySpan<T> source)
         {
-            Add(valueReader(ref ctx));
-        }
-    }
+            if (source.IsEmpty)
+            {
+                return;
+            }
 
-    public void RaiseChanged()
-    {
-        OnChanged?.Invoke(this, new ChangedEvent());
-    }
-
-    public void ClearChanged()
-    {
-
-    }
-
-    private void EnsureSize(int size)
-    {
-        if (array.Length < size)
-        {
-            size = Math.Max(size, 8);
-            int size2 = Math.Max(array.Length * 2, size);
-            SetSize(size2);
-        }
-    }
-
-    private void SetSize(int size)
-    {
-        if (size != array.Length)
-        {
-            T[] destinationArray = new T[size];
-            Array.Copy(array, 0, destinationArray, 0, count);
-            array = destinationArray;
-        }
-    }
-
-    public void Add(T item)
-    {
-        EnsureSize(count + 1);
-        array[count++] = item;
-    }
-
-    public void Clear()
-    {
-        Array.Clear(array, 0, count);
-        count = 0;
-    }
-
-    public bool Contains(T item)
-    {
-        return IndexOf(item) != -1;
-    }
-
-    public void CopyTo(T[] array, int arrayIndex)
-    {
-        Array.Copy(this.array, 0, array, arrayIndex, count);
-    }
-
-    public bool Remove(T item)
-    {
-        int num = IndexOf(item);
-        if (num == -1)
-        {
-            return false;
-        }
-
-        Array.Copy(array, num + 1, array, num, count - num - 1);
-        count--;
-        array[count] = default(T);
-        return true;
-    }
-
-    public void AddRange(IEnumerable<T> values)
-    {
-        Preconditions.CheckNotNull(values, "values");
-        if (values is Repeated<T> repeatedField)
-        {
-            EnsureSize(count + repeatedField.count);
-            Array.Copy(repeatedField.array, 0, array, count, repeatedField.count);
-            count += repeatedField.count;
-            return;
-        }
-
-        if (values is ICollection { Count: var num } collection)
-        {
             if (default(T) == null)
             {
-                foreach (object item in collection)
+                for (int i = 0; i < source.Length; i++)
                 {
-                    if (item == null)
+                    if (source[i] == null)
                     {
-                        throw new ArgumentException("Sequence contained null element", "values");
+                        throw new ArgumentException("ReadOnlySpan contained null element", "source");
                     }
                 }
             }
 
-            EnsureSize(count + num);
-            collection.CopyTo(array, count);
-            count += num;
-            return;
+            EnsureSize(count + source.Length);
+            source.CopyTo(array.AsSpan(count));
+            count += source.Length;
         }
 
-        foreach (T value in values)
+        public void Add(IEnumerable<T> values)
         {
-            Add(value);
-        }
-    }
-
-    [SecuritySafeCritical]
-    internal void AddRangeSpan(ReadOnlySpan<T> source)
-    {
-        if (source.IsEmpty)
-        {
-            return;
+            AddRange(values);
         }
 
-        if (default(T) == null)
+        public IEnumerator<T> GetEnumerator()
         {
-            for (int i = 0; i < source.Length; i++)
+            for (int i = 0; i < count; i++)
             {
-                if (source[i] == null)
-                {
-                    throw new ArgumentException("ReadOnlySpan contained null element", "source");
-                }
+                yield return array[i];
             }
         }
 
-        EnsureSize(count + source.Length);
-        source.CopyTo(array.AsSpan(count));
-        count += source.Length;
-    }
-
-    public void Add(IEnumerable<T> values)
-    {
-        AddRange(values);
-    }
-
-    public IEnumerator<T> GetEnumerator()
-    {
-        for (int i = 0; i < count; i++)
+        public override bool Equals(object obj)
         {
-            yield return array[i];
-        }
-    }
-
-    public override bool Equals(object obj)
-    {
-        return Equals(obj as Repeated<T>);
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
-
-    public override int GetHashCode()
-    {
-        int num = 0;
-        for (int i = 0; i < count; i++)
-        {
-            num = num * 31 + array[i].GetHashCode();
+            return Equals(obj as Repeated<T>);
         }
 
-        return num;
-    }
-
-    public bool Equals(Repeated<T> other)
-    {
-        if (other == null)
+        IEnumerator IEnumerable.GetEnumerator()
         {
-            return false;
+            return GetEnumerator();
         }
 
-        if (other == this)
+        public override int GetHashCode()
         {
-            return true;
+            int num = 0;
+            for (int i = 0; i < count; i++)
+            {
+                num = num * 31 + array[i].GetHashCode();
+            }
+
+            return num;
         }
 
-        if (other.Count != Count)
+        public bool Equals(Repeated<T> other)
         {
-            return false;
-        }
-
-        EqualityComparer<T> equalityComparer = EqualityComparer;
-        for (int i = 0; i < count; i++)
-        {
-            if (!equalityComparer.Equals(array[i], other.array[i]))
+            if (other == null)
             {
                 return false;
             }
-        }
 
-        return true;
-    }
-
-    public int IndexOf(T item)
-    {
-        EqualityComparer<T> equalityComparer = EqualityComparer;
-        for (int i = 0; i < count; i++)
-        {
-            if (equalityComparer.Equals(array[i], item))
+            if (other == this)
             {
-                return i;
+                return true;
             }
+
+            if (other.Count != Count)
+            {
+                return false;
+            }
+
+            EqualityComparer<T> equalityComparer = EqualityComparer;
+            for (int i = 0; i < count; i++)
+            {
+                if (!equalityComparer.Equals(array[i], other.array[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
-        return -1;
-    }
-
-    public void Insert(int index, T item)
-    {
-        if (index < 0 || index > count)
+        public int IndexOf(T item)
         {
-            throw new ArgumentOutOfRangeException("index");
-        }
+            EqualityComparer<T> equalityComparer = EqualityComparer;
+            for (int i = 0; i < count; i++)
+            {
+                if (equalityComparer.Equals(array[i], item))
+                {
+                    return i;
+                }
+            }
 
-        EnsureSize(count + 1);
-        Array.Copy(array, index, array, index + 1, count - index);
-        array[index] = item;
-        count++;
-    }
-
-    public void RemoveAt(int index)
-    {
-        if (index < 0 || index >= count)
-        {
-            throw new ArgumentOutOfRangeException("index");
-        }
-
-        Array.Copy(array, index + 1, array, index, count - index - 1);
-        count--;
-        array[count] = default(T);
-    }
-
-    public override string ToString()
-    {
-        StringWriter stringWriter = new StringWriter();
-        JsonFormatter.WriteList(stringWriter, this);
-        return stringWriter.ToString();
-    }
-
-    [SecuritySafeCritical]
-    internal Span<T> AsSpan()
-    {
-        return array.AsSpan(0, count);
-    }
-
-    internal void SetCount(int targetCount)
-    {
-        if (targetCount < 0)
-        {
-            throw new ArgumentOutOfRangeException("targetCount", targetCount, "Non-negative number required.");
-        }
-
-        if (targetCount > Capacity)
-        {
-            EnsureSize(targetCount);
-        }
-        else if (targetCount < count && RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-        {
-            Array.Clear(array, targetCount, count - targetCount);
-        }
-
-        count = targetCount;
-    }
-
-    void ICollection.CopyTo(Array array, int index)
-    {
-        Array.Copy(this.array, 0, array, index, count);
-    }
-
-    int IList.Add(object value)
-    {
-        Add((T)value);
-        return count - 1;
-    }
-
-    bool IList.Contains(object value)
-    {
-        if (value is T item)
-        {
-            return Contains(item);
-        }
-
-        return false;
-    }
-
-    int IList.IndexOf(object value)
-    {
-        if (!(value is T item))
-        {
             return -1;
         }
 
-        return IndexOf(item);
-    }
-
-    void IList.Insert(int index, object value)
-    {
-        Insert(index, (T)value);
-    }
-
-    void IList.Remove(object value)
-    {
-        if (value is T item)
+        public void Insert(int index, T item)
         {
-            Remove(item);
+            if (index < 0 || index > count)
+            {
+                throw new ArgumentOutOfRangeException("index");
+            }
+
+            EnsureSize(count + 1);
+            Array.Copy(array, index, array, index + 1, count - index);
+            array[index] = item;
+            count++;
+        }
+
+        public void RemoveAt(int index)
+        {
+            if (index < 0 || index >= count)
+            {
+                throw new ArgumentOutOfRangeException("index");
+            }
+
+            Array.Copy(array, index + 1, array, index, count - index - 1);
+            count--;
+            array[count] = default(T);
+        }
+
+        public override string ToString()
+        {
+            StringWriter stringWriter = new StringWriter();
+            JsonFormatter.WriteList(stringWriter, this);
+            return stringWriter.ToString();
+        }
+
+        [SecuritySafeCritical]
+        internal Span<T> AsSpan()
+        {
+            return array.AsSpan(0, count);
+        }
+
+        internal void SetCount(int targetCount)
+        {
+            if (targetCount < 0)
+            {
+                throw new ArgumentOutOfRangeException("targetCount", targetCount, "Non-negative number required.");
+            }
+
+            if (targetCount > Capacity)
+            {
+                EnsureSize(targetCount);
+            }
+            else if (targetCount < count && RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+            {
+                Array.Clear(array, targetCount, count - targetCount);
+            }
+
+            count = targetCount;
+        }
+
+        void ICollection.CopyTo(Array array, int index)
+        {
+            Array.Copy(this.array, 0, array, index, count);
+        }
+
+        int IList.Add(object value)
+        {
+            Add((T)value);
+            return count - 1;
+        }
+
+        bool IList.Contains(object value)
+        {
+            if (value is T item)
+            {
+                return Contains(item);
+            }
+
+            return false;
+        }
+
+        int IList.IndexOf(object value)
+        {
+            if (!(value is T item))
+            {
+                return -1;
+            }
+
+            return IndexOf(item);
+        }
+
+        void IList.Insert(int index, object value)
+        {
+            Insert(index, (T)value);
+        }
+
+        void IList.Remove(object value)
+        {
+            if (value is T item)
+            {
+                Remove(item);
+            }
         }
     }
 }
