@@ -124,55 +124,105 @@ namespace Kdsync
 
         private void WriteStart(char token)
         {
+            if (_indented)
+            {
+                WriteStartIndented(token);
+            }
+            else
+            {
+                WriteStartMinimized(token);
+            }
+        }
+
+        private void WriteStartMinimized(char token)
+        {
             if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
             {
-                _writer.Write(",");
+                _writer.Write(',');
             }
+            _writer.Write(token);
+            _currentDepth++;
+        }
 
-            if (_indented && _tokenType != JsonTokenType.None && _tokenType != JsonTokenType.PropertyName)
+        private void WriteStartIndented(char token)
+        {
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
+            {
+                _writer.Write(',');
+            }
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.PropertyName)
             {
                 _writer.Write('\n');
                 WriteIndentation(_currentDepth);
             }
-
             _writer.Write(token);
-
             _currentDepth++;
         }
 
         private void WriteEnd(char token)
         {
+            if (_indented)
+            {
+                WriteEndIndented(token);
+            }
+            else
+            {
+                WriteEndMinimized(token);
+            }
+        }
+
+        private void WriteEndMinimized(char token)
+        {
+            _currentDepth--;
+            _writer.Write(token);
+        }
+
+        private void WriteEndIndented(char token)
+        {
             _currentDepth--;
 
-            if (_indented && _tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
+            if (_tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
             {
                 _writer.Write('\n');
                 WriteIndentation(_currentDepth);
             }
-
             _writer.Write(token);
         }
 
         public void WritePropertyName(string name)
         {
-            WritePropertyNameEscaped(name);
+            if (_indented)
+            {
+                WritePropertyNameEscapedIndented(name);
+            }
+            else
+            {
+                WritePropertyNameEscapedMinimized(name);
+            }
         }
 
-        private void WritePropertyNameEscaped(string name)
+        private void WritePropertyNameEscapedMinimized(string name)
         {
             if (_tokenType != JsonTokenType.StartObject)
             {
-                _writer.Write(",");
+                _writer.Write(',');
             }
-
-            if (_indented)
-            {
-                _writer.WriteLine();
-                WriteIndentation(_currentDepth);
-            }
-
             WriteEscapedString(name);
-            _writer.Write(": ");
+            _writer.Write(':');
+            _tokenType = JsonTokenType.PropertyName;
+        }
+
+        private void WritePropertyNameEscapedIndented(string name)
+        {
+            if (_tokenType != JsonTokenType.StartObject)
+            {
+                _writer.Write(',');
+            }
+            _writer.Write('\n');
+            WriteIndentation(_currentDepth);
+            WriteEscapedString(name);
+            _writer.Write(':');
+            _writer.Write(' ');
             _tokenType = JsonTokenType.PropertyName;
         }
 
@@ -455,23 +505,23 @@ namespace Kdsync
             {
                 switch (kvp.Key)
                 {
-                    case bool b:
-                        WritePropertyName(b ? "true" : "false");
+                    case bool k:
+                        WritePropertyName(k ? "true" : "false");
                         break;
-                    case string s:
-                        WritePropertyName(s);
+                    case string k:
+                        WritePropertyName(k);
                         break;
-                    case int i:
-                        WritePropertyName(i.ToString("d", CultureInfo.InvariantCulture));
+                    case int k:
+                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
                         break;
-                    case uint u:
-                        WritePropertyName(u.ToString("d", CultureInfo.InvariantCulture));
+                    case uint k:
+                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
                         break;
-                    case long l:
-                        WritePropertyName(l.ToString("d", CultureInfo.InvariantCulture));
+                    case long k:
+                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
                         break;
-                    case ulong ul:
-                        WritePropertyName(ul.ToString("d", CultureInfo.InvariantCulture));
+                    case ulong k:
+                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
                         break;
                     default:
                         WritePropertyName(kvp.Key.ToString());
@@ -483,47 +533,47 @@ namespace Kdsync
                     case null:
                         WriteNullValue();
                         break;
-                    case IMessage m:
-                        WriteMessageValue(m);
+                    case IMessage v:
+                        WriteMessageValue(v);
                         break;
-                    case Enum e:
-                        WriteEnumValue(e);
+                    case Enum v:
+                        WriteEnumValue(v);
                         break;
-                    case bool b:
-                        WriteBooleanValue(b);
+                    case bool v:
+                        WriteBooleanValue(v);
                         break;
-                    case string s:
-                        WriteStringValue(s);
+                    case string v:
+                        WriteStringValue(v);
                         break;
-                    case byte[] bytes:
-                        WriteBase64Value(bytes);
+                    case byte[] v:
+                        WriteBase64Value(v);
                         break;
-                    case int i:
-                        WriteNumberValue(i);
+                    case int v:
+                        WriteNumberValue(v);
                         break;
-                    case uint u:
-                        WriteNumberValue(u);
+                    case uint v:
+                        WriteNumberValue(v);
                         break;
-                    case long l:
-                        WriteNumberValue(l);
+                    case long v:
+                        WriteNumberValue(v);
                         break;
-                    case ulong ul:
-                        WriteNumberValue(ul);
+                    case ulong v:
+                        WriteNumberValue(v);
                         break;
-                    case float f:
-                        WriteNumberValue(f);
+                    case float v:
+                        WriteNumberValue(v);
                         break;
-                    case double d:
-                        WriteNumberValue(d);
+                    case double v:
+                        WriteNumberValue(v);
                         break;
-                    case Timestamp t:
-                        WriteTimestampValue(t);
+                    case Timestamp v:
+                        WriteTimestampValue(v);
                         break;
-                    case Duration d:
-                        WriteDurationValue(d);
+                    case Duration v:
+                        WriteDurationValue(v);
                         break;
-                    case Empty e:
-                        WriteEmptyValue(e);
+                    case Empty v:
+                        WriteEmptyValue(v);
                         break;
                     default:
                         WriteStringValue(kvp.Value.ToString());
@@ -535,13 +585,33 @@ namespace Kdsync
 
         private void WriteValueSeparator()
         {
+            if (_indented)
+            {
+                WriteValueSeparatorIndented();
+            }
+            else
+            {
+                WriteValueSeparatorMinimized();
+            }
+        }
+
+        private void WriteValueSeparatorMinimized()
+        {
             if (_tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartArray)
             {
-                _writer.Write(",");
+                _writer.Write(',');
             }
-            if (_indented && _tokenType != JsonTokenType.PropertyName)
+        }
+
+        private void WriteValueSeparatorIndented()
+        {
+            if (_tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartArray)
             {
-                _writer.WriteLine();
+                _writer.Write(',');
+            }
+            if (_tokenType != JsonTokenType.PropertyName)
+            {
+                _writer.Write('\n');
                 WriteIndentation(_currentDepth);
             }
         }
