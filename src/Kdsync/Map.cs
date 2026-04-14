@@ -1,10 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Security;
 
 namespace Kdsync
 {
@@ -613,9 +611,9 @@ namespace Kdsync
 
         public override string ToString()
         {
-            StringWriter stringWriter = new StringWriter();
-            JsonFormatter.WriteDictionary(stringWriter, this);
-            return stringWriter.ToString();
+            JsonWriter writer = new JsonWriter();
+            writer.WriteMapValue(this);
+            return writer.ToString();
         }
 
         void IDictionary.Add(object key, object value)

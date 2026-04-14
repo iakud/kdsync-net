@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security;
 
@@ -348,9 +347,9 @@ namespace Kdsync
 
         public override string ToString()
         {
-            StringWriter stringWriter = new StringWriter();
-            JsonFormatter.WriteList(stringWriter, this);
-            return stringWriter.ToString();
+            JsonWriter writer = new JsonWriter();
+            writer.WriteRepeatedValue(this);
+            return writer.ToString();
         }
 
         [SecuritySafeCritical]

@@ -217,5 +217,11 @@ namespace Kdsync
             return !(a == b);
         }
 
+        public override string ToString()
+        {
+            JsonWriter writer = new JsonWriter();
+            writer.WriteTimestampValue(this);
+            return writer.ToString();
+        }
     }
 }
