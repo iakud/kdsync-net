@@ -63,9 +63,14 @@ namespace Kdsync
             return ForString("");
         }
 
+        public static FieldCodec<byte[]> ForBytes()
+        {
+            return ForBytes(Array.Empty<byte>());
+        }
+
         public static FieldCodec<bool> ForBool()
         {
-            return ForBool(defaultValue: false);
+            return ForBool(false);
         }
 
         public static FieldCodec<int> ForInt32()
