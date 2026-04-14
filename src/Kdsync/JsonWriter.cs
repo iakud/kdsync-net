@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -25,6 +26,32 @@ namespace Kdsync
     public sealed class JsonWriter : IDisposable
     {
         private static readonly string[] CommonRepresentations;
+
+        private static readonly ConcurrentDictionary<Type, Action<JsonWriter, object?>> PropertyNameWriters = new ConcurrentDictionary<Type, Action<JsonWriter, object?>>
+        {
+            [typeof(bool)] = (w, v) => w.WritePropertyName((bool)v!),
+            [typeof(string)] = (w, v) => w.WritePropertyName((string)v!),
+            [typeof(int)] = (w, v) => w.WritePropertyName((int)v!),
+            [typeof(uint)] = (w, v) => w.WritePropertyName((uint)v!),
+            [typeof(long)] = (w, v) => w.WritePropertyName((long)v!),
+            [typeof(ulong)] = (w, v) => w.WritePropertyName((ulong)v!),
+        };
+
+        private static readonly ConcurrentDictionary<Type, Action<JsonWriter, object?>> ValueWriters = new ConcurrentDictionary<Type, Action<JsonWriter, object?>>
+        {
+            [typeof(bool)] = (w, v) => w.WriteBooleanValue((bool)v!),
+            [typeof(string)] = (w, v) => w.WriteStringValue((string)v!),
+            [typeof(byte[])] = (w, v) => w.WriteBase64Value((byte[])v!),
+            [typeof(int)] = (w, v) => w.WriteNumberValue((int)v!),
+            [typeof(uint)] = (w, v) => w.WriteNumberValue((uint)v!),
+            [typeof(long)] = (w, v) => w.WriteNumberValue((long)v!),
+            [typeof(ulong)] = (w, v) => w.WriteNumberValue((ulong)v!),
+            [typeof(float)] = (w, v) => w.WriteNumberValue((float)v!),
+            [typeof(double)] = (w, v) => w.WriteNumberValue((double)v!),
+            [typeof(Timestamp)] = (w, v) => w.WriteTimestampValue((Timestamp)v!),
+            [typeof(Duration)] = (w, v) => w.WriteDurationValue((Duration)v!),
+            [typeof(Empty)] = (w, v) => w.WriteEmptyValue((Empty)v!),
+        };
 
         private const string Hex = "0123456789abcdef";
 
@@ -199,6 +226,31 @@ namespace Kdsync
             {
                 WritePropertyNameEscapedMinimized(name);
             }
+        }
+
+        private void WritePropertyName(bool key)
+        {
+            WritePropertyName(key ? "true" : "false");
+        }
+
+        private void WritePropertyName(int key)
+        {
+            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
+        }
+
+        private void WritePropertyName(uint key)
+        {
+            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
+        }
+
+        private void WritePropertyName(long key)
+        {
+            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
+        }
+
+        private void WritePropertyName(ulong key)
+        {
+            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
         }
 
         private void WritePropertyNameEscapedMinimized(string name)
@@ -439,58 +491,33 @@ namespace Kdsync
         public void WriteRepeatedValue<T>(Repeated<T> repeated)
         {
             WriteStartArray();
-            foreach (var value in repeated)
+            Type valueType = typeof(T);
+            if (ValueWriters.TryGetValue(valueType, out var valueWriter))
             {
-                switch (value)
+                foreach (T value in repeated)
                 {
-                    case null:
-                        WriteNullValue();
-                        break;
-                    case IMessage m:
-                        WriteMessageValue(m);
-                        break;
-                    case Enum e:
-                        WriteEnumValue(e);
-                        break;
-                    case bool b:
-                        WriteBooleanValue(b);
-                        break;
-                    case string s:
-                        WriteStringValue(s);
-                        break;
-                    case byte[] bytes:
-                        WriteBase64Value(bytes);
-                        break;
-                    case int i:
-                        WriteNumberValue(i);
-                        break;
-                    case uint u:
-                        WriteNumberValue(u);
-                        break;
-                    case long l:
-                        WriteNumberValue(l);
-                        break;
-                    case ulong ul:
-                        WriteNumberValue(ul);
-                        break;
-                    case float f:
-                        WriteNumberValue(f);
-                        break;
-                    case double d:
-                        WriteNumberValue(d);
-                        break;
-                    case Timestamp t:
-                        WriteTimestampValue(t);
-                        break;
-                    case Duration d:
-                        WriteDurationValue(d);
-                        break;
-                    case Empty e:
-                        WriteEmptyValue(e);
-                        break;
-                    default:
-                        WriteStringValue(value.ToString());
-                        break;
+                    valueWriter(this, value);
+                }
+            }
+            else if (valueType.IsEnum)
+            {
+                foreach (T value in repeated)
+                {
+                    WriteEnumValue((Enum)(object)value!);
+                }
+            }
+            else if (typeof(IMessage).IsAssignableFrom(valueType))
+            {
+                foreach (T value in repeated)
+                {
+                    WriteMessageValue((IMessage)value!);
+                }
+            }
+            else
+            {
+                foreach (T value in repeated)
+                {
+                    WriteStringValue(value!.ToString());
                 }
             }
             WriteEndArray();
@@ -499,85 +526,41 @@ namespace Kdsync
         public void WriteMapValue<TKey, TValue>(Map<TKey, TValue> map)
         {
             WriteStartObject();
+            Type keyType = typeof(TKey);
+            Type valueType = typeof(TValue);
             List<KeyValuePair<TKey, TValue>> kvps = map.ToList();
-            kvps.Sort((KeyValuePair<TKey, TValue> pair1, KeyValuePair<TKey, TValue> pair2) => (typeof(TKey) == typeof(string)) ? StringComparer.Ordinal.Compare(pair1.Key.ToString(), pair2.Key.ToString()) : Comparer<TKey>.Default.Compare(pair1.Key, pair2.Key));
-            foreach (var kvp in kvps)
+            kvps.Sort((KeyValuePair<TKey, TValue> pair1, KeyValuePair<TKey, TValue> pair2) => (keyType == typeof(string)) ? StringComparer.Ordinal.Compare(pair1.Key!.ToString(), pair2.Key!.ToString()) : Comparer<TKey>.Default.Compare(pair1.Key, pair2.Key));
+            Action<JsonWriter, object?> propertyNameWriter = PropertyNameWriters.GetValueOrDefault(keyType, (writer, value) => writer.WriteStringValue(value!.ToString()));
+            if (ValueWriters.TryGetValue(valueType, out var valueWriter))
             {
-                switch (kvp.Key)
+                foreach (var kvp in kvps)
                 {
-                    case bool k:
-                        WritePropertyName(k ? "true" : "false");
-                        break;
-                    case string k:
-                        WritePropertyName(k);
-                        break;
-                    case int k:
-                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
-                        break;
-                    case uint k:
-                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
-                        break;
-                    case long k:
-                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
-                        break;
-                    case ulong k:
-                        WritePropertyName(k.ToString("d", CultureInfo.InvariantCulture));
-                        break;
-                    default:
-                        WritePropertyName(kvp.Key.ToString());
-                        break;
+                    propertyNameWriter(this, kvp.Key);
+                    valueWriter(this, kvp.Value);
                 }
-
-                switch (kvp.Value)
+            }
+            else if (valueType.IsEnum)
+            {
+                foreach (var kvp in kvps)
                 {
-                    case null:
-                        WriteNullValue();
-                        break;
-                    case IMessage v:
-                        WriteMessageValue(v);
-                        break;
-                    case Enum v:
-                        WriteEnumValue(v);
-                        break;
-                    case bool v:
-                        WriteBooleanValue(v);
-                        break;
-                    case string v:
-                        WriteStringValue(v);
-                        break;
-                    case byte[] v:
-                        WriteBase64Value(v);
-                        break;
-                    case int v:
-                        WriteNumberValue(v);
-                        break;
-                    case uint v:
-                        WriteNumberValue(v);
-                        break;
-                    case long v:
-                        WriteNumberValue(v);
-                        break;
-                    case ulong v:
-                        WriteNumberValue(v);
-                        break;
-                    case float v:
-                        WriteNumberValue(v);
-                        break;
-                    case double v:
-                        WriteNumberValue(v);
-                        break;
-                    case Timestamp v:
-                        WriteTimestampValue(v);
-                        break;
-                    case Duration v:
-                        WriteDurationValue(v);
-                        break;
-                    case Empty v:
-                        WriteEmptyValue(v);
-                        break;
-                    default:
-                        WriteStringValue(kvp.Value.ToString());
-                        break;
+                    propertyNameWriter(this, kvp.Key);
+                    WriteEnumValue((Enum)(object)kvp.Value!);
+                }
+            }
+            else if (typeof(IMessage).IsAssignableFrom(valueType))
+            {
+                foreach (var kvp in kvps)
+                {
+                    propertyNameWriter(this, kvp.Key);
+                    WriteMessageValue((IMessage)kvp.Value!);
+                }
+            }
+            else
+            {
+                foreach (var kvp in kvps)
+                {
+                    propertyNameWriter(this, kvp.Key);
+                    WriteStringValue(kvp.Value!.ToString());
                 }
             }
             WriteEndObject();
