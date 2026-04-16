@@ -97,7 +97,7 @@ namespace Kdsync
             SegmentedBufferHelper.PopLimit(ref ctx.state, oldLimit);
         }
 
-        public static IEnumerable<TKey> ReadMapDeleteKeys<TKey, TValue>(ref ParseContext ctx, Map<TKey, TValue>.Codec codec)
+        public static IEnumerable<T> ReadMapDeleteKeys<T>(ref ParseContext ctx, FieldCodec<T> keyCodec)
         {
             int byteLimit = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
             if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
@@ -108,8 +108,8 @@ namespace Kdsync
             int oldLimit = SegmentedBufferHelper.PushLimit(ref ctx.state, byteLimit);
             ctx.state.recursionDepth++;
 
-            List<TKey> keys = new List<TKey>();
-            ValueReader<TKey> valueReader = codec.KeyCodec.ValueReader;
+            List<T> keys = new List<T>();
+            ValueReader<T> valueReader = keyCodec.ValueReader;
             while (!SegmentedBufferHelper.IsReachedLimit(ref ctx.state))
             {
                 keys.Add(valueReader(ref ctx));

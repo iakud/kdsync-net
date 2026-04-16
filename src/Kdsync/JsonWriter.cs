@@ -10,48 +10,17 @@ namespace Kdsync
     internal enum JsonTokenType
     {
         None,
-        PropertyName,
-        String,
-        Number,
-        True,
-        False,
-        Null,
+        Name,
+        Scalar,
         StartObject,
         EndObject,
         StartArray,
-        EndArray,
-        Comment
+        EndArray
     }
 
     public sealed class JsonWriter : IDisposable
     {
         private static readonly string[] CommonRepresentations;
-
-        private static readonly ConcurrentDictionary<Type, Action<JsonWriter, object?>> PropertyNameWriters = new ConcurrentDictionary<Type, Action<JsonWriter, object?>>
-        {
-            [typeof(bool)] = (w, v) => w.WritePropertyName((bool)v!),
-            [typeof(string)] = (w, v) => w.WritePropertyName((string)v!),
-            [typeof(int)] = (w, v) => w.WritePropertyName((int)v!),
-            [typeof(uint)] = (w, v) => w.WritePropertyName((uint)v!),
-            [typeof(long)] = (w, v) => w.WritePropertyName((long)v!),
-            [typeof(ulong)] = (w, v) => w.WritePropertyName((ulong)v!),
-        };
-
-        private static readonly ConcurrentDictionary<Type, Action<JsonWriter, object?>> ValueWriters = new ConcurrentDictionary<Type, Action<JsonWriter, object?>>
-        {
-            [typeof(bool)] = (w, v) => w.WriteBooleanValue((bool)v!),
-            [typeof(string)] = (w, v) => w.WriteStringValue((string)v!),
-            [typeof(byte[])] = (w, v) => w.WriteBase64Value((byte[])v!),
-            [typeof(int)] = (w, v) => w.WriteNumberValue((int)v!),
-            [typeof(uint)] = (w, v) => w.WriteNumberValue((uint)v!),
-            [typeof(long)] = (w, v) => w.WriteNumberValue((long)v!),
-            [typeof(ulong)] = (w, v) => w.WriteNumberValue((ulong)v!),
-            [typeof(float)] = (w, v) => w.WriteNumberValue((float)v!),
-            [typeof(double)] = (w, v) => w.WriteNumberValue((double)v!),
-            [typeof(Timestamp)] = (w, v) => w.WriteTimestampValue((Timestamp)v!),
-            [typeof(Duration)] = (w, v) => w.WriteDurationValue((Duration)v!),
-            [typeof(Empty)] = (w, v) => w.WriteEmptyValue((Empty)v!),
-        };
 
         private const string Hex = "0123456789abcdef";
 
@@ -84,6 +53,28 @@ namespace Kdsync
                 }
             }
         }
+
+        public static void WriteName(JsonWriter writer, bool name) => writer.WriteName(name);
+        public static void WriteName(JsonWriter writer, string name) => writer.WriteName(name);
+        public static void WriteName(JsonWriter writer, int name) => writer.WriteName(name);
+        public static void WriteName(JsonWriter writer, uint name) => writer.WriteName(name);
+        public static void WriteName(JsonWriter writer, long name) => writer.WriteName(name);
+        public static void WriteName(JsonWriter writer, ulong name) => writer.WriteName(name);
+
+        public static void WriteBoolValue(JsonWriter writer, bool value) => writer.WriteBoolValue(value);
+        public static void WriteIntValue(JsonWriter writer, int value) => writer.WriteIntValue(value);
+        public static void WriteUIntValue(JsonWriter writer, uint value) => writer.WriteUIntValue(value);
+        public static void WriteLongValue(JsonWriter writer, long value) => writer.WriteLongValue(value);
+        public static void WriteULongValue(JsonWriter writer, ulong value) => writer.WriteULongValue(value);
+        public static void WriteFloatValue(JsonWriter writer, float value) => writer.WriteFloatValue(value);
+        public static void WriteDoubleValue(JsonWriter writer, double value) => writer.WriteDoubleValue(value);
+        public static void WriteBytesValue(JsonWriter writer, byte[] value) => writer.WriteBase64Value(value);
+        public static void WriteStringValue(JsonWriter writer, string value) => writer.WriteStringValue(value);
+        public static void WriteTimestampValue(JsonWriter writer, Timestamp value) => writer.WriteTimestampValue(value);
+        public static void WriteDurationValue(JsonWriter writer, Duration value) => writer.WriteDurationValue(value);
+        public static void WriteEmptyValue(JsonWriter writer, Empty value) => writer.WriteEmptyValue(value);
+        public static void WriteEnumValue<T>(JsonWriter writer, T value) where T : Enum => writer.WriteEnumValue(value);
+        public static void WriteValue(JsonWriter writer, IMessage value) => writer.WriteValue(value);
 
         private readonly TextWriter _writer = new StringWriter();
         private readonly bool _indented;
@@ -163,7 +154,7 @@ namespace Kdsync
 
         private void WriteStartMinimized(char token)
         {
-            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
             {
                 _writer.Write(',');
             }
@@ -173,11 +164,11 @@ namespace Kdsync
 
         private void WriteStartIndented(char token)
         {
-            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartObject && _tokenType != JsonTokenType.StartArray)
             {
                 _writer.Write(',');
             }
-            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.PropertyName)
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.Name)
             {
                 _writer.Write('\n');
                 WriteIndentation(_currentDepth);
@@ -216,44 +207,44 @@ namespace Kdsync
             _writer.Write(token);
         }
 
-        public void WritePropertyName(string name)
+        public void WriteName(string name)
         {
             if (_indented)
             {
-                WritePropertyNameEscapedIndented(name);
+                WriteNameEscapedIndented(name);
             }
             else
             {
-                WritePropertyNameEscapedMinimized(name);
+                WriteNameEscapedMinimized(name);
             }
         }
 
-        private void WritePropertyName(bool key)
+        private void WriteName(bool key)
         {
-            WritePropertyName(key ? "true" : "false");
+            WriteName(key ? "true" : "false");
         }
 
-        private void WritePropertyName(int key)
+        private void WriteName(int key)
         {
-            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
+            WriteName(key.ToString("d", CultureInfo.InvariantCulture));
         }
 
-        private void WritePropertyName(uint key)
+        private void WriteName(uint key)
         {
-            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
+            WriteName(key.ToString("d", CultureInfo.InvariantCulture));
         }
 
-        private void WritePropertyName(long key)
+        private void WriteName(long key)
         {
-            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
+            WriteName(key.ToString("d", CultureInfo.InvariantCulture));
         }
 
-        private void WritePropertyName(ulong key)
+        private void WriteName(ulong key)
         {
-            WritePropertyName(key.ToString("d", CultureInfo.InvariantCulture));
+            WriteName(key.ToString("d", CultureInfo.InvariantCulture));
         }
 
-        private void WritePropertyNameEscapedMinimized(string name)
+        private void WriteNameEscapedMinimized(string name)
         {
             if (_tokenType != JsonTokenType.StartObject)
             {
@@ -261,10 +252,10 @@ namespace Kdsync
             }
             WriteEscapedString(name);
             _writer.Write(':');
-            _tokenType = JsonTokenType.PropertyName;
+            _tokenType = JsonTokenType.Name;
         }
 
-        private void WritePropertyNameEscapedIndented(string name)
+        private void WriteNameEscapedIndented(string name)
         {
             if (_tokenType != JsonTokenType.StartObject)
             {
@@ -275,108 +266,108 @@ namespace Kdsync
             WriteEscapedString(name);
             _writer.Write(':');
             _writer.Write(' ');
-            _tokenType = JsonTokenType.PropertyName;
+            _tokenType = JsonTokenType.Name;
         }
 
-        public void WriteNull(string propertyName)
+        public void WriteNull(string name)
         {
-            WritePropertyName(propertyName);
+            WriteName(name);
             WriteNullValue();
         }
 
-        public void WriteBoolean(string propertyName, bool value)
+        public void WriteBool(string name, bool value)
         {
-            WritePropertyName(propertyName);
-            WriteBooleanValue(value);
+            WriteName(name);
+            WriteBoolValue(value);
         }
 
-        public void WriteNumber(string propertyName, int value)
+        public void WriteInt(string name, int value)
         {
-            WritePropertyName(propertyName);
-            WriteNumberValue(value);
+            WriteName(name);
+            WriteIntValue(value);
         }
 
-        public void WriteNumber(string propertyName, uint value)
+        public void WriteUInt(string name, uint value)
         {
-            WritePropertyName(propertyName);
-            WriteNumberValue(value);
+            WriteName(name);
+            WriteUIntValue(value);
         }
 
-        public void WriteNumber(string propertyName, long value)
+        public void WriteLong(string name, long value)
         {
-            WritePropertyName(propertyName);
-            WriteNumberValue(value);
+            WriteName(name);
+            WriteLongValue(value);
         }
 
-        public void WriteNumber(string propertyName, ulong value)
+        public void WriteULong(string name, ulong value)
         {
-            WritePropertyName(propertyName);
-            WriteNumberValue(value);
+            WriteName(name);
+            WriteULongValue(value);
         }
 
-        public void WriteNumber(string propertyName, float value)
+        public void WriteFloat(string name, float value)
         {
-            WritePropertyName(propertyName);
-            WriteNumberValue(value);
+            WriteName(name);
+            WriteFloatValue(value);
         }
 
-        public void WriteNumber(string propertyName, double value)
+        public void WriteDouble(string name, double value)
         {
-            WritePropertyName(propertyName);
-            WriteNumberValue(value);
+            WriteName(name);
+            WriteDoubleValue(value);
         }
 
-        public void WriteString(string propertyName, string value)
+        public void WriteString(string name, string value)
         {
-            WritePropertyName(propertyName);
+            WriteName(name);
             WriteStringValue(value);
         }
 
-        public void WriteBase64(string propertyName, byte[] value)
+        public void WriteBase64(string name, byte[] value)
         {
-            WritePropertyName(propertyName);
+            WriteName(name);
             WriteBase64Value(value);
         }
 
-        public void WriteEnum(string propertyName, Enum value)
+        public void WriteEnum(string name, Enum value)
         {
-            WriteNumber(propertyName, Convert.ToInt32(value));
+            WriteInt(name, Convert.ToInt32(value));
         }
 
-        public void WriteTimestamp(string propertyName, Timestamp value)
+        public void WriteTimestamp(string name, Timestamp value)
         {
-            WritePropertyName(propertyName);
+            WriteName(name);
             WriteTimestampValue(value);
         }
 
-        public void WriteDuration(string propertyName, Duration value)
+        public void WriteDuration(string name, Duration value)
         {
-            WritePropertyName(propertyName);
+            WriteName(name);
             WriteDurationValue(value);
         }
 
-        public void WriteEmpty(string propertyName, Empty value)
+        public void WriteEmpty(string name, Empty value)
         {
-            WritePropertyName(propertyName);
+            WriteName(name);
             WriteEmptyValue(value);
         }
 
-        public void WriteMessage(string propertyName, IMessage value)
+        public void WriteMessage(string name, IMessage value)
         {
-            WritePropertyName(propertyName);
-            WriteMessageValue(value);
+            WriteName(name);
+            WriteValue(value);
         }
 
-        public void WriteRepeated<T>(string propertyName, Repeated<T> value)
+        public void WriteRepeated<T>(string name, Repeated<T> value)
         {
-            WritePropertyName(propertyName);
-            WriteRepeatedValue(value);
+            WriteName(name);
+            value.Write(this);
         }
 
-        public void WriteMap<TKey, TValue>(string propertyName, Map<TKey, TValue> value)
+        public void WriteMap<TKey, TValue>(string name, Map<TKey, TValue> value)
         {
-            WritePropertyName(propertyName);
-            WriteMapValue(value);
+            WriteName(name);
+            value.Write(this);
         }
 
         // Value-only methods
@@ -384,67 +375,67 @@ namespace Kdsync
         {
             WriteValueSeparator();
             _writer.Write("null");
-            _tokenType = JsonTokenType.Null;
+            _tokenType = JsonTokenType.Scalar;
         }
 
-        public void WriteBooleanValue(bool value)
+        public void WriteBoolValue(bool value)
         {
             WriteValueSeparator();
             _writer.Write(value ? "true" : "false");
-            _tokenType = value ? JsonTokenType.True : JsonTokenType.False;
+            _tokenType = JsonTokenType.Scalar;
         }
 
-        public void WriteNumberValue(int value)
+        public void WriteIntValue(int value)
         {
             WriteValueSeparator();
             _writer.Write(value.ToString("d", CultureInfo.InvariantCulture));
-            _tokenType = JsonTokenType.Number;
+            _tokenType = JsonTokenType.Scalar;
         }
 
-        public void WriteNumberValue(uint value)
+        public void WriteUIntValue(uint value)
         {
             WriteValueSeparator();
             _writer.Write(value.ToString("d", CultureInfo.InvariantCulture));
-            _tokenType = JsonTokenType.Number;
+            _tokenType = JsonTokenType.Scalar;
         }
 
-        public void WriteNumberValue(long value)
-        {
-            WriteValueSeparator();
-            _writer.Write('"');
-            _writer.Write(value.ToString("d", CultureInfo.InvariantCulture));
-            _writer.Write('"');
-            _tokenType = JsonTokenType.Number;
-        }
-
-        public void WriteNumberValue(ulong value)
+        public void WriteLongValue(long value)
         {
             WriteValueSeparator();
             _writer.Write('"');
             _writer.Write(value.ToString("d", CultureInfo.InvariantCulture));
             _writer.Write('"');
-            _tokenType = JsonTokenType.Number;
+            _tokenType = JsonTokenType.Scalar;
         }
 
-        public void WriteNumberValue(float value)
+        public void WriteULongValue(ulong value)
+        {
+            WriteValueSeparator();
+            _writer.Write('"');
+            _writer.Write(value.ToString("d", CultureInfo.InvariantCulture));
+            _writer.Write('"');
+            _tokenType = JsonTokenType.Scalar;
+        }
+
+        public void WriteFloatValue(float value)
         {
             WriteValueSeparator();
             _writer.Write(FormatFloat(value));
-            _tokenType = JsonTokenType.Number;
+            _tokenType = JsonTokenType.Scalar;
         }
 
-        public void WriteNumberValue(double value)
+        public void WriteDoubleValue(double value)
         {
             WriteValueSeparator();
             _writer.Write(FormatDouble(value));
-            _tokenType = JsonTokenType.Number;
+            _tokenType = JsonTokenType.Scalar;
         }
 
         public void WriteStringValue(string value)
         {
             WriteValueSeparator();
             WriteEscapedString(value);
-            _tokenType = JsonTokenType.String;
+            _tokenType = JsonTokenType.Scalar;
         }
 
         public void WriteBase64Value(byte[] value)
@@ -453,27 +444,27 @@ namespace Kdsync
             _writer.Write('"');
             _writer.Write(Convert.ToBase64String(value));
             _writer.Write('"');
-            _tokenType = JsonTokenType.String;
+            _tokenType = JsonTokenType.Scalar;
         }
 
         public void WriteEnumValue(Enum value)
         {
-            WriteNumberValue(Convert.ToInt32(value));
+            WriteIntValue(Convert.ToInt32(value));
         }
 
         public void WriteTimestampValue(Timestamp value)
         {
             WriteStartObject();
-            WriteNumber("Seconds", value.Seconds);
-            WriteNumber("Nanos", value.Nanos);
+            WriteLong("Seconds", value.Seconds);
+            WriteInt("Nanos", value.Nanos);
             WriteEndObject();
         }
 
         public void WriteDurationValue(Duration value)
         {
             WriteStartObject();
-            WriteNumber("Seconds", value.Seconds);
-            WriteNumber("Nanos", value.Nanos);
+            WriteLong("Seconds", value.Seconds);
+            WriteInt("Nanos", value.Nanos);
             WriteEndObject();
         }
 
@@ -483,87 +474,9 @@ namespace Kdsync
             WriteEndObject();
         }
 
-        public void WriteMessageValue(IMessage value)
+        public void WriteValue(IMessage value)
         {
             value.Write(this);
-        }
-
-        public void WriteRepeatedValue<T>(Repeated<T> repeated)
-        {
-            WriteStartArray();
-            Type valueType = typeof(T);
-            if (ValueWriters.TryGetValue(valueType, out var valueWriter))
-            {
-                foreach (T value in repeated)
-                {
-                    valueWriter(this, value);
-                }
-            }
-            else if (valueType.IsEnum)
-            {
-                foreach (T value in repeated)
-                {
-                    WriteEnumValue((Enum)(object)value!);
-                }
-            }
-            else if (typeof(IMessage).IsAssignableFrom(valueType))
-            {
-                foreach (T value in repeated)
-                {
-                    WriteMessageValue((IMessage)value!);
-                }
-            }
-            else
-            {
-                foreach (T value in repeated)
-                {
-                    WriteStringValue(value!.ToString());
-                }
-            }
-            WriteEndArray();
-        }
-
-        public void WriteMapValue<TKey, TValue>(Map<TKey, TValue> map)
-        {
-            WriteStartObject();
-            Type keyType = typeof(TKey);
-            Type valueType = typeof(TValue);
-            List<KeyValuePair<TKey, TValue>> kvps = map.ToList();
-            kvps.Sort((KeyValuePair<TKey, TValue> pair1, KeyValuePair<TKey, TValue> pair2) => (keyType == typeof(string)) ? StringComparer.Ordinal.Compare(pair1.Key!.ToString(), pair2.Key!.ToString()) : Comparer<TKey>.Default.Compare(pair1.Key, pair2.Key));
-            Action<JsonWriter, object?> propertyNameWriter = PropertyNameWriters.GetValueOrDefault(keyType, (writer, value) => writer.WriteStringValue(value!.ToString()));
-            if (ValueWriters.TryGetValue(valueType, out var valueWriter))
-            {
-                foreach (var kvp in kvps)
-                {
-                    propertyNameWriter(this, kvp.Key);
-                    valueWriter(this, kvp.Value);
-                }
-            }
-            else if (valueType.IsEnum)
-            {
-                foreach (var kvp in kvps)
-                {
-                    propertyNameWriter(this, kvp.Key);
-                    WriteEnumValue((Enum)(object)kvp.Value!);
-                }
-            }
-            else if (typeof(IMessage).IsAssignableFrom(valueType))
-            {
-                foreach (var kvp in kvps)
-                {
-                    propertyNameWriter(this, kvp.Key);
-                    WriteMessageValue((IMessage)kvp.Value!);
-                }
-            }
-            else
-            {
-                foreach (var kvp in kvps)
-                {
-                    propertyNameWriter(this, kvp.Key);
-                    WriteStringValue(kvp.Value!.ToString());
-                }
-            }
-            WriteEndObject();
         }
 
         private void WriteValueSeparator()
@@ -580,7 +493,7 @@ namespace Kdsync
 
         private void WriteValueSeparatorMinimized()
         {
-            if (_tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartArray)
+            if (_tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartArray)
             {
                 _writer.Write(',');
             }
@@ -588,11 +501,11 @@ namespace Kdsync
 
         private void WriteValueSeparatorIndented()
         {
-            if (_tokenType != JsonTokenType.PropertyName && _tokenType != JsonTokenType.StartArray)
+            if (_tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartArray)
             {
                 _writer.Write(',');
             }
-            if (_tokenType != JsonTokenType.PropertyName)
+            if (_tokenType != JsonTokenType.Name)
             {
                 _writer.Write('\n');
                 WriteIndentation(_currentDepth);

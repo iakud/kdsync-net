@@ -10,11 +10,15 @@ namespace Kdsync
 
         internal delegate bool ValuesMerger(ref T value, T other);
 
+        internal delegate void JsonValueWriter(JsonWriter writer, T value);
+
         private static readonly T DefaultDefault;
 
         internal ValueReader<T> ValueReader { get; }
 
         internal InputMerger ValueMerger { get; }
+
+        internal JsonValueWriter JsonWriter { get; }
 
         internal T DefaultValue { get; }
 
@@ -30,23 +34,24 @@ namespace Kdsync
             }
         }
 
-        internal FieldCodec(ValueReader<T> reader, T defaultValue)
+        internal FieldCodec(ValueReader<T> reader, JsonValueWriter jsonWriter, T defaultValue)
             : this(reader, delegate (ref ParseContext ctx, ref T v)
             {
                 v = reader(ref ctx);
-            }, defaultValue)
+            }, jsonWriter, defaultValue)
         {
         }
 
-        internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger)
-            : this(reader, inputMerger, DefaultDefault)
+        internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger, JsonValueWriter jsonWriter)
+            : this(reader, inputMerger, jsonWriter, DefaultDefault)
         {
         }
 
-        internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger, T defaultValue)
+        internal FieldCodec(ValueReader<T> reader, InputMerger inputMerger, JsonValueWriter jsonWriter, T defaultValue)
         {
             ValueReader = reader;
             ValueMerger = inputMerger;
+            JsonWriter = jsonWriter;
             DefaultValue = defaultValue;
         }
 
@@ -58,227 +63,158 @@ namespace Kdsync
 
     public static class FieldCodec
     {
-        public static FieldCodec<string> ForString()
-        {
-            return ForString("");
-        }
-
-        public static FieldCodec<byte[]> ForBytes()
-        {
-            return ForBytes(Array.Empty<byte>());
-        }
-
-        public static FieldCodec<bool> ForBool()
-        {
-            return ForBool(false);
-        }
-
-        public static FieldCodec<int> ForInt32()
-        {
-            return ForInt32(0);
-        }
-
-        public static FieldCodec<int> ForSInt32()
-        {
-            return ForSInt32(0);
-        }
-
-        public static FieldCodec<uint> ForFixed32()
-        {
-            return ForFixed32(0u);
-        }
-
-        public static FieldCodec<int> ForSFixed32()
-        {
-            return ForSFixed32(0);
-        }
-
-        public static FieldCodec<uint> ForUInt32()
-        {
-            return ForUInt32(0u);
-        }
-
-        public static FieldCodec<long> ForInt64()
-        {
-            return ForInt64(0L);
-        }
-
-        public static FieldCodec<long> ForSInt64()
-        {
-            return ForSInt64(0L);
-        }
-
-        public static FieldCodec<ulong> ForFixed64()
-        {
-            return ForFixed64(0uL);
-        }
-
-        public static FieldCodec<long> ForSFixed64()
-        {
-            return ForSFixed64(0L);
-        }
-
-        public static FieldCodec<ulong> ForUInt64()
-        {
-            return ForUInt64(0uL);
-        }
-
-        public static FieldCodec<float> ForFloat()
-        {
-            return ForFloat(0f);
-        }
-
-        public static FieldCodec<double> ForDouble()
-        {
-            return ForDouble(0.0);
-        }
-
-        public static FieldCodec<Timestamp> ForTimestamp()
-        {
-            return ForTimestamp(default);
-        }
-
-        public static FieldCodec<Duration> ForDuration()
-        {
-            return ForDuration(default);
-        }
-
-        public static FieldCodec<Empty> ForEmpty()
-        {
-            return ForEmpty(default);
-        }
-
-        public static FieldCodec<T> ForEnum<T>(Func<T, int> toInt32, Func<int, T> fromInt32)
-        {
-            return ForEnum(toInt32, fromInt32, default(T));
-        }
-
-        public static FieldCodec<string> ForString(string defaultValue)
-        {
-            return new FieldCodec<string>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadString();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<byte[]> ForBytes(byte[] defaultValue)
-        {
-            return new FieldCodec<byte[]>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadBytes();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<bool> ForBool(bool defaultValue)
+        public static FieldCodec<bool> ForBoolKey()
         {
             return new FieldCodec<bool>(delegate (ref ParseContext ctx)
             {
                 return ctx.ReadBool();
-            }, defaultValue);
+            }, JsonWriter.WriteName, false);
         }
 
-        public static FieldCodec<int> ForInt32(int defaultValue)
+        public static FieldCodec<int> ForIntKey()
         {
             return new FieldCodec<int>(delegate (ref ParseContext ctx)
             {
                 return ctx.ReadInt32();
-            }, defaultValue);
+            }, JsonWriter.WriteName, 0);
         }
 
-        public static FieldCodec<int> ForSInt32(int defaultValue)
-        {
-            return new FieldCodec<int>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadSInt32();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<uint> ForFixed32(uint defaultValue)
-        {
-            return new FieldCodec<uint>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadFixed32();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<int> ForSFixed32(int defaultValue)
-        {
-            return new FieldCodec<int>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadSFixed32();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<uint> ForUInt32(uint defaultValue)
+        public static FieldCodec<uint> ForUIntKey()
         {
             return new FieldCodec<uint>(delegate (ref ParseContext ctx)
             {
                 return ctx.ReadUInt32();
-            }, defaultValue);
+            }, JsonWriter.WriteName, 0u);
         }
 
-        public static FieldCodec<long> ForInt64(long defaultValue)
+        public static FieldCodec<long> ForLongKey()
         {
             return new FieldCodec<long>(delegate (ref ParseContext ctx)
             {
                 return ctx.ReadInt64();
-            }, defaultValue);
+            }, JsonWriter.WriteName, 0L);
         }
 
-        public static FieldCodec<long> ForSInt64(long defaultValue)
-        {
-            return new FieldCodec<long>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadSInt64();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<ulong> ForFixed64(ulong defaultValue)
-        {
-            return new FieldCodec<ulong>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadFixed64();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<long> ForSFixed64(long defaultValue)
-        {
-            return new FieldCodec<long>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadSFixed64();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<ulong> ForUInt64(ulong defaultValue)
+        public static FieldCodec<ulong> ForULongKey()
         {
             return new FieldCodec<ulong>(delegate (ref ParseContext ctx)
             {
                 return ctx.ReadUInt64();
-            }, defaultValue);
+            }, JsonWriter.WriteName, 0uL);
         }
 
-        public static FieldCodec<float> ForFloat(float defaultValue)
+        public static FieldCodec<string> ForStringKey()
+        {
+            return new FieldCodec<string>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadString();
+            }, JsonWriter.WriteName, "");
+        }
+
+        // Value Codec
+
+        public static FieldCodec<bool> ForBoolValue()
+        {
+            return new FieldCodec<bool>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadBool();
+            }, JsonWriter.WriteBoolValue, false);
+        }
+
+        public static FieldCodec<int> ForIntValue()
+        {
+            return new FieldCodec<int>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadInt32();
+            }, JsonWriter.WriteIntValue, 0);
+        }
+
+        public static FieldCodec<uint> ForUIntValue()
+        {
+            return new FieldCodec<uint>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadUInt32();
+            }, JsonWriter.WriteUIntValue, 0u);
+        }
+
+        public static FieldCodec<long> ForLongValue()
+        {
+            return new FieldCodec<long>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadInt64();
+            }, JsonWriter.WriteLongValue, 0L);
+        }
+
+        public static FieldCodec<ulong> ForULongValue()
+        {
+            return new FieldCodec<ulong>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadUInt64();
+            }, JsonWriter.WriteULongValue, 0uL);
+        }
+
+        public static FieldCodec<float> ForFloatValue()
         {
             return new FieldCodec<float>(delegate (ref ParseContext ctx)
             {
                 return ctx.ReadFloat();
-            }, defaultValue);
+            }, JsonWriter.WriteFloatValue, 0f);
         }
 
-        public static FieldCodec<double> ForDouble(double defaultValue)
+        public static FieldCodec<double> ForDoubleValue()
         {
             return new FieldCodec<double>(delegate (ref ParseContext ctx)
             {
                 return ctx.ReadDouble();
-            }, defaultValue);
+            }, JsonWriter.WriteDoubleValue, 0.0);
         }
 
-        public static FieldCodec<T> ForEnum<T>(Func<T, int> toInt32, Func<int, T> fromInt32, T defaultValue)
+        public static FieldCodec<byte[]> ForBytesValue()
+        {
+            return new FieldCodec<byte[]>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadBytes();
+            }, JsonWriter.WriteBytesValue, Array.Empty<byte>());
+        }
+
+        public static FieldCodec<string> ForStringValue()
+        {
+            return new FieldCodec<string>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadString();
+            }, JsonWriter.WriteStringValue, "");
+        }
+
+        public static FieldCodec<Timestamp> ForTimestampValue()
+        {
+            return new FieldCodec<Timestamp>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadTimestamp();
+            }, JsonWriter.WriteTimestampValue, default);
+        }
+
+        public static FieldCodec<Duration> ForDurationValue()
+        {
+            return new FieldCodec<Duration>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadDuration();
+            }, JsonWriter.WriteDurationValue, default);
+        }
+
+        public static FieldCodec<Empty> ForEmptyValue()
+        {
+            return new FieldCodec<Empty>(delegate (ref ParseContext ctx)
+            {
+                return ctx.ReadEmpty();
+            }, JsonWriter.WriteEmptyValue, default);
+        }
+
+        public static FieldCodec<T> ForEnum<T>() where T : Enum
         {
             return new FieldCodec<T>(delegate (ref ParseContext ctx)
             {
-                return fromInt32(ctx.ReadEnum());
-            }, defaultValue);
+                return (T)(object)ctx.ReadEnum();
+            }, JsonWriter.WriteEnumValue, default);
         }
 
         public static FieldCodec<T> ForMessage<T>() where T : class, IMessage, new()
@@ -298,31 +234,7 @@ namespace Kdsync
                 }
 
                 ctx.ReadMessage(v);
-            });
-        }
-
-        public static FieldCodec<Timestamp> ForTimestamp(Timestamp defaultValue)
-        {
-            return new FieldCodec<Timestamp>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadTimestamp();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<Duration> ForDuration(Duration defaultValue)
-        {
-            return new FieldCodec<Duration>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadDuration();
-            }, defaultValue);
-        }
-
-        public static FieldCodec<Empty> ForEmpty(Empty defaultValue)
-        {
-            return new FieldCodec<Empty>(delegate (ref ParseContext ctx)
-            {
-                return ctx.ReadEmpty();
-            }, defaultValue);
+            }, JsonWriter.WriteValue);
         }
     }
 }

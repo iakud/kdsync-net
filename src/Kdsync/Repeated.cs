@@ -22,7 +22,14 @@ namespace Kdsync
 
         private int count;
 
+        private FieldCodec<T> _valueCodec;
+
         public event Action<Repeated<T>, ChangedEvent>? OnChanged;
+
+        public Repeated(FieldCodec<T> valueCodec)
+        {
+            _valueCodec = valueCodec;
+        }
 
         public int Capacity
         {
@@ -88,7 +95,7 @@ namespace Kdsync
             }
         }
 
-        public void MergeFrom(ref ParseContext ctx, FieldCodec<T> codec)
+        public void MergeFrom(ref ParseContext ctx)
         {
             int byteLimit = ctx.ReadLength();
             if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
@@ -97,7 +104,7 @@ namespace Kdsync
             }
             int oldLimit = ctx.PushLimit(byteLimit);
             ctx.state.recursionDepth++;
-            MergeEntriesFrom(ref ctx, codec);
+            MergeEntriesFrom(ref ctx);
             if (!ctx.ReachedLimit)
             {
                 throw InvalidException.TruncatedMessage();
@@ -107,10 +114,10 @@ namespace Kdsync
             ctx.PopLimit(oldLimit);
         }
 
-        private void MergeEntriesFrom(ref ParseContext ctx, FieldCodec<T> codec)
+        private void MergeEntriesFrom(ref ParseContext ctx)
         {
             Clear();
-            ValueReader<T> valueReader = codec.ValueReader;
+            ValueReader<T> valueReader = _valueCodec.ValueReader;
             while (!ctx.ReachedLimit)
             {
                 Add(valueReader(ref ctx));
@@ -345,10 +352,21 @@ namespace Kdsync
             array[count] = default(T);
         }
 
+        public void Write(JsonWriter writer)
+        {
+            var jsonWriter = _valueCodec.JsonWriter;
+            writer.WriteStartArray();
+            foreach (T value in this)
+            {
+                jsonWriter(writer, value);
+            }
+            writer.WriteEndArray();
+        }
+
         public override string ToString()
         {
             JsonWriter writer = new JsonWriter();
-            writer.WriteRepeatedValue(this);
+            Write(writer);
             return writer.ToString();
         }
 
