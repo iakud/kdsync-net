@@ -197,13 +197,6 @@ namespace Kdsync
 
         public event Action<Map<TKey, TValue>, ChangedEvent>? OnChanged;
 
-        private Codec _codec;
-
-        public Map(Codec codec)
-        {
-            _codec = codec;
-        }
-
         public TValue this[TKey key]
         {
             get
@@ -450,7 +443,7 @@ namespace Kdsync
             return true;
         }
 
-        public void MergeFrom(ref ParseContext ctx)
+        public void MergeFrom(ref ParseContext ctx, Codec codec)
         {
             int byteLimit = ctx.ReadLength();
             if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
@@ -474,7 +467,7 @@ namespace Kdsync
                         clear = ctx.ReadBool();
                         break;
                     case DeletesFieldNumber:
-                        deleteKeys = ParsingPrimitivesMessages.ReadMapDeleteKeys(ref ctx, _codec.KeyCodec);
+                        deleteKeys = ParsingPrimitivesMessages.ReadMapDeleteKeys(ref ctx, codec.KeyCodec);
                         break;
                     case EntriesFieldNumber:
                         int size = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
@@ -501,11 +494,11 @@ namespace Kdsync
                 ParseContext.Initialize(ctx.buffer.Slice(entry.Item1, entry.Item2), out var entryCtx);
                 if (typeof(TValue) is IMessage)
                 {
-                    MergeMessageEntriesFrom(ref entryCtx);
+                    MergeMessageEntriesFrom(ref entryCtx, codec);
                 }
                 else
                 {
-                    MergeEntriesFrom(ref entryCtx);
+                    MergeEntriesFrom(ref entryCtx, codec);
                 }
             }
 
@@ -520,9 +513,9 @@ namespace Kdsync
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void MergeMessageEntriesFrom(ref ParseContext ctx)
+        private void MergeMessageEntriesFrom(ref ParseContext ctx, Codec codec)
         {
-            TKey key = _codec.KeyCodec.DefaultValue;
+            TKey key = codec.KeyCodec.DefaultValue;
             ReadOnlySpan<byte> valSpan = ParsingPrimitivesMessages.ZeroLengthMessageStreamData;
             uint tag;
             while ((tag = ctx.ReadTag()) != 0)
@@ -530,7 +523,7 @@ namespace Kdsync
                 int num = WireFormat.GetTagFieldNumber(tag);
                 if (num == KeyFieldNumber)
                 {
-                    key = _codec.KeyCodec.Read(ref ctx);
+                    key = codec.KeyCodec.Read(ref ctx);
                 }
                 else if (num == ValueFieldNumber)
                 {
@@ -547,11 +540,11 @@ namespace Kdsync
             ParseContext.Initialize(valSpan, out var valueCtx);
             if (TryGetValue(key, out var value))
             {
-                _codec.ValueCodec.ValueMerger(ref valueCtx, ref value);
+                codec.ValueCodec.ValueMerger(ref valueCtx, ref value);
             }
             else
             {
-                this[key] = _codec.ValueCodec.Read(ref valueCtx);
+                this[key] = codec.ValueCodec.Read(ref valueCtx);
             }
             _updates.Add(key);
 
@@ -563,21 +556,21 @@ namespace Kdsync
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void MergeEntriesFrom(ref ParseContext ctx)
+        private void MergeEntriesFrom(ref ParseContext ctx, Codec codec)
         {
-            TKey key = _codec.KeyCodec.DefaultValue;
-            TValue val = _codec.ValueCodec.DefaultValue;
+            TKey key = codec.KeyCodec.DefaultValue;
+            TValue val = codec.ValueCodec.DefaultValue;
             uint tag;
             while ((tag = ctx.ReadTag()) != 0)
             {
                 int num = WireFormat.GetTagFieldNumber(tag);
                 if (num == KeyFieldNumber)
                 {
-                    key = _codec.KeyCodec.Read(ref ctx);
+                    key = codec.KeyCodec.Read(ref ctx);
                 }
                 else if (num == ValueFieldNumber)
                 {
-                    val = _codec.ValueCodec.Read(ref ctx);
+                    val = codec.ValueCodec.Read(ref ctx);
                 }
                 else
                 {
@@ -618,13 +611,34 @@ namespace Kdsync
 
         public void Write(JsonWriter writer)
         {
-            var keyJsonWriter = _codec.KeyCodec.JsonWriter;
-            var valueJsonWriter = _codec.ValueCodec.JsonWriter;
+            var nameWriter = JsonWriter.NameWriter<TKey>();
+            var valueType = typeof(TValue);
+
             writer.WriteStartObject();
-            foreach (var kvp in GetSortedListCopy(list))
+            if (typeof(IMessage).IsAssignableFrom(valueType))
             {
-                keyJsonWriter(writer, kvp.Key);
-                valueJsonWriter(writer, kvp.Value);
+                foreach (var kvp in GetSortedListCopy(list))
+                {
+                    nameWriter(writer, kvp.Key);
+                    writer.WriteValue((IMessage)kvp.Value!);
+                }
+            }
+            else if (valueType.IsEnum)
+            {
+                foreach (var kvp in GetSortedListCopy(list))
+                {
+                    nameWriter(writer, kvp.Key);
+                    writer.WriteIntValue(Convert.ToInt32(kvp.Value));
+                }
+            }
+            else
+            {
+                var valueWriter = JsonWriter.ValueWriter<TValue>();
+                foreach (var kvp in GetSortedListCopy(list))
+                {
+                    nameWriter(writer, kvp.Key);
+                    valueWriter(writer, kvp.Value);
+                }
             }
             writer.WriteEndObject();
         }

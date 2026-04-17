@@ -1,9 +1,7 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 
 namespace Kdsync
 {
@@ -52,6 +50,50 @@ namespace Kdsync
                     CommonRepresentations[i] = ((char)i).ToString();
                 }
             }
+        }
+
+        private static readonly Dictionary<Type, Delegate> _nameWriters = new()
+        {
+            [typeof(bool)] = (Action<JsonWriter, bool>)WriteName,
+            [typeof(string)] = (Action<JsonWriter, string>)WriteName,
+            [typeof(int)] = (Action<JsonWriter, int>)WriteName,
+            [typeof(uint)] = (Action<JsonWriter, uint>)WriteName,
+            [typeof(long)] = (Action<JsonWriter, long>)WriteName,
+            [typeof(ulong)] = (Action<JsonWriter, ulong>)WriteName,
+        };
+
+        public static Action<JsonWriter, T> NameWriter<T>()
+        {
+            if (_nameWriters.TryGetValue(typeof(T), out var nameWriter))
+            {
+                return (Action<JsonWriter, T>)nameWriter;
+            }
+            throw new NotSupportedException();
+        }
+
+        private static readonly Dictionary<Type, Delegate> _valueWriters = new()
+        {
+            [typeof(bool)] = (Action<JsonWriter, bool>)WriteBoolValue,
+            [typeof(int)] = (Action<JsonWriter, int>)WriteIntValue,
+            [typeof(uint)] = (Action<JsonWriter, uint>)WriteUIntValue,
+            [typeof(long)] = (Action<JsonWriter, long>)WriteLongValue,
+            [typeof(ulong)] = (Action<JsonWriter, ulong>)WriteULongValue,
+            [typeof(float)] = (Action<JsonWriter, float>)WriteFloatValue,
+            [typeof(double)] = (Action<JsonWriter, double>)WriteDoubleValue,
+            [typeof(byte[])] = (Action<JsonWriter, byte[]>)WriteBytesValue,
+            [typeof(string)] = (Action<JsonWriter, string>)WriteStringValue,
+            [typeof(Timestamp)] = (Action<JsonWriter, Timestamp>)WriteTimestampValue,
+            [typeof(Duration)] = (Action<JsonWriter, Duration>)WriteDurationValue,
+            [typeof(Empty)] = (Action<JsonWriter, Empty>)WriteEmptyValue,
+        };
+
+        public static Action<JsonWriter, T> ValueWriter<T>()
+        {
+            if (_valueWriters.TryGetValue(typeof(T), out var valueWriter))
+            {
+                return (Action<JsonWriter, T>)valueWriter;
+            }
+            throw new NotSupportedException();
         }
 
         public static void WriteName(JsonWriter writer, bool name) => writer.WriteName(name);

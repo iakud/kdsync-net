@@ -22,14 +22,7 @@ namespace Kdsync
 
         private int count;
 
-        private FieldCodec<T> _valueCodec;
-
         public event Action<Repeated<T>, ChangedEvent>? OnChanged;
-
-        public Repeated(FieldCodec<T> valueCodec)
-        {
-            _valueCodec = valueCodec;
-        }
 
         public int Capacity
         {
@@ -95,7 +88,7 @@ namespace Kdsync
             }
         }
 
-        public void MergeFrom(ref ParseContext ctx)
+        public void MergeFrom(ref ParseContext ctx, FieldCodec<T> fieldCodec)
         {
             int byteLimit = ctx.ReadLength();
             if (ctx.state.recursionDepth >= ctx.state.recursionLimit)
@@ -104,7 +97,7 @@ namespace Kdsync
             }
             int oldLimit = ctx.PushLimit(byteLimit);
             ctx.state.recursionDepth++;
-            MergeEntriesFrom(ref ctx);
+            MergeEntriesFrom(ref ctx, fieldCodec);
             if (!ctx.ReachedLimit)
             {
                 throw InvalidException.TruncatedMessage();
@@ -114,10 +107,10 @@ namespace Kdsync
             ctx.PopLimit(oldLimit);
         }
 
-        private void MergeEntriesFrom(ref ParseContext ctx)
+        private void MergeEntriesFrom(ref ParseContext ctx, FieldCodec<T> fieldCodec)
         {
             Clear();
-            ValueReader<T> valueReader = _valueCodec.ValueReader;
+            ValueReader<T> valueReader = fieldCodec.ValueReader;
             while (!ctx.ReachedLimit)
             {
                 Add(valueReader(ref ctx));
@@ -354,11 +347,29 @@ namespace Kdsync
 
         public void Write(JsonWriter writer)
         {
-            var jsonWriter = _valueCodec.JsonWriter;
+            var valueType = typeof(T);
             writer.WriteStartArray();
-            foreach (T value in this)
+            if (typeof(IMessage).IsAssignableFrom(valueType))
             {
-                jsonWriter(writer, value);
+                foreach (T value in this)
+                {
+                    writer.WriteValue((IMessage)value!);
+                }
+            }
+            else if (valueType.IsEnum)
+            {
+                foreach (T value in this)
+                {
+                    writer.WriteIntValue(Convert.ToInt32(value));
+                }
+            }
+            else
+            {
+                var valueWriter = JsonWriter.ValueWriter<T>();
+                foreach (T value in this)
+                {
+                    valueWriter(writer, value);
+                }
             }
             writer.WriteEndArray();
         }
