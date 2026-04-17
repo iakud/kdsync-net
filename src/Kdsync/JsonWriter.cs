@@ -535,7 +535,7 @@ namespace Kdsync
 
         private void WriteValueSeparatorMinimized()
         {
-            if (_tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartArray)
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartArray)
             {
                 _writer.Write(',');
             }
@@ -543,11 +543,11 @@ namespace Kdsync
 
         private void WriteValueSeparatorIndented()
         {
-            if (_tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartArray)
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.Name && _tokenType != JsonTokenType.StartArray)
             {
                 _writer.Write(',');
             }
-            if (_tokenType != JsonTokenType.Name)
+            if (_tokenType != JsonTokenType.None && _tokenType != JsonTokenType.Name)
             {
                 _writer.Write('\n');
                 WriteIndentation(_currentDepth);
