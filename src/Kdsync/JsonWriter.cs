@@ -52,6 +52,8 @@ namespace Kdsync
             }
         }
 
+        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         private static readonly Dictionary<Type, Delegate> _nameWriters = new()
         {
             [typeof(bool)] = (Action<JsonWriter, bool>)WriteName,
@@ -496,18 +498,49 @@ namespace Kdsync
 
         public void WriteTimestampValue(Timestamp value)
         {
-            WriteStartObject();
-            WriteLong("Seconds", value.Seconds);
-            WriteInt("Nanos", value.Nanos);
-            WriteEndObject();
+            WriteValueSeparator();
+            DateTime dateTime = UnixEpoch.AddSeconds(value.Seconds);
+            _writer.Write('"');
+            _writer.Write(dateTime.ToString("yyyy'-'MM'-'dd'T'HH:mm:ss", CultureInfo.InvariantCulture));
+            AppendNanoseconds(value.Nanos);
+            _writer.Write('Z');
+            _writer.Write('"');
+            _tokenType = JsonTokenType.Scalar;
         }
 
         public void WriteDurationValue(Duration value)
         {
-            WriteStartObject();
-            WriteLong("Seconds", value.Seconds);
-            WriteInt("Nanos", value.Nanos);
-            WriteEndObject();
+            WriteValueSeparator();
+            _writer.Write('"');
+            if (value.Seconds == 0L && value.Nanos < 0)
+            {
+                _writer.Write('-');
+            }
+            _writer.Write(value.Seconds.ToString("d", CultureInfo.InvariantCulture));
+            AppendNanoseconds(Math.Abs(value.Nanos));
+            _writer.Write('s');
+            _writer.Write('"');
+            _tokenType = JsonTokenType.Scalar;
+        }
+
+        internal void AppendNanoseconds(int nanos)
+        {
+            if (nanos != 0)
+            {
+                _writer.Write('.');
+                if (nanos % 1000000 == 0)
+                {
+                    _writer.Write((nanos / 1000000).ToString("d3", CultureInfo.InvariantCulture));
+                }
+                else if (nanos % 1000 == 0)
+                {
+                    _writer.Write((nanos / 1000).ToString("d6", CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    _writer.Write(nanos.ToString("d9", CultureInfo.InvariantCulture));
+                }
+            }
         }
 
         public void WriteEmptyValue(Empty value)
