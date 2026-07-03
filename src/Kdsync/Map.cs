@@ -185,6 +185,8 @@ namespace Kdsync
 
         private static readonly EqualityComparer<TKey> KeyEqualityComparer = EqualityComparers.GetEqualityComparer<TKey>();
 
+        private static readonly bool IsMessageValue = typeof(IMessage).IsAssignableFrom(typeof(TValue));
+
         private readonly Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>> map = new Dictionary<TKey, LinkedListNode<KeyValuePair<TKey, TValue>>>(KeyEqualityComparer);
 
         private readonly LinkedList<KeyValuePair<TKey, TValue>> list = new LinkedList<KeyValuePair<TKey, TValue>>();
@@ -492,7 +494,7 @@ namespace Kdsync
             foreach (ref ValueTuple<int, int> entry in entries.ToArray().AsSpan())
             {
                 ParseContext.Initialize(ctx.buffer.Slice(entry.Item1, entry.Item2), out var entryCtx);
-                if (typeof(TValue) is IMessage)
+                if (IsMessageValue)
                 {
                     MergeMessageEntriesFrom(ref entryCtx, codec);
                 }
@@ -615,7 +617,7 @@ namespace Kdsync
             var valueType = typeof(TValue);
 
             writer.WriteStartObject();
-            if (typeof(IMessage).IsAssignableFrom(valueType))
+            if (IsMessageValue)
             {
                 foreach (var kvp in GetSortedListCopy(list))
                 {
