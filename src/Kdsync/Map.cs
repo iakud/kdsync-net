@@ -529,9 +529,8 @@ namespace Kdsync
                 }
                 else if (num == ValueFieldNumber)
                 {
-                    int size = ParsingPrimitives.ParseLength(ref ctx.buffer, ref ctx.state);
-                    valSpan = ctx.buffer.Slice(ctx.state.bufferPos, size);
-                    ParsingPrimitives.SkipRawBytes(ref ctx.buffer, ref ctx.state, size);
+                    valSpan = ctx.buffer.Slice(ctx.state.bufferPos);
+                    ctx.SkipLastField();
                 }
                 else
                 {
