@@ -197,6 +197,8 @@ namespace Kdsync
 
         private readonly HashSet<TKey> _updates = new HashSet<TKey>(KeyEqualityComparer);
 
+        private Action? _changedParent;
+
         public event Action<Map<TKey, TValue>, ChangedEvent>? OnChanged;
 
         public TValue this[TKey key]
@@ -214,20 +216,43 @@ namespace Kdsync
             set
             {
                 Preconditions.CheckNotNullUnconstrained(key, "key");
-                if (value == null)
-                {
-                    Preconditions.CheckNotNullUnconstrained(value, "value");
-                }
+                // if (value == null)
+                // {
+                //     Preconditions.CheckNotNullUnconstrained(value, "value");
+                // }
 
                 KeyValuePair<TKey, TValue> value2 = new KeyValuePair<TKey, TValue>(key, value);
                 if (map.TryGetValue(key, out var value3))
                 {
+                    if (ValueEqualityComparer.Equals(value3.Value.Value, value))
+                        return;
+
+                    if (IsMessageValue)
+                    {
+                        if (value != null && ((IMessage)(object)value).CheckChangedParent())
+                            throw new InvalidOperationException("the component should be removed from its original place first");
+                        if (value3.Value.Value != null)
+                            ((IMessage)(object)value3.Value.Value).ClearChangedParent();
+                        if (value != null)
+                            ((IMessage)(object)value).SetChangedParent(() => UpdatedChanged(key));
+                    }
+
                     value3.Value = value2;
+                    UpdatedChanged(key);
                     return;
+                }
+
+                if (IsMessageValue)
+                {
+                    if (value != null && ((IMessage)(object)value).CheckChangedParent())
+                        throw new InvalidOperationException("the component should be removed from its original place first");
+                    if (value != null)
+                        ((IMessage)(object)value).SetChangedParent(() => UpdatedChanged(key));
                 }
 
                 value3 = list.AddLast(value2);
                 map[key] = value3;
+                UpdatedChanged(key);
             }
         }
 
@@ -298,8 +323,15 @@ namespace Kdsync
             Preconditions.CheckNotNullUnconstrained(key, "key");
             if (map.TryGetValue(key, out var value))
             {
+                if (IsMessageValue)
+                {
+                    if (value.Value.Value != null)
+                        ((IMessage)(object)value.Value.Value).ClearChangedParent();
+                }
+
                 map.Remove(key);
                 value.List.Remove(value);
+                DeletedChanged(key);
                 return true;
             }
 
@@ -353,8 +385,21 @@ namespace Kdsync
 
         public void Clear()
         {
+            if (list.Count == 0)
+                return;
+
+            if (IsMessageValue)
+            {
+                foreach (var kvp in list)
+                {
+                    if (kvp.Value != null)
+                        ((IMessage)(object)kvp.Value).ClearChangedParent();
+                }
+            }
+
             list.Clear();
             map.Clear();
+            ClearedChanged();
         }
 
         bool ICollection<KeyValuePair<TKey, TValue>>.Contains(KeyValuePair<TKey, TValue> item)
@@ -381,8 +426,15 @@ namespace Kdsync
 
             if (map.TryGetValue(item.Key, out var value) && EqualityComparer<TValue>.Default.Equals(item.Value, value.Value.Value))
             {
+                if (IsMessageValue)
+                {
+                    if (value.Value.Value != null)
+                        ((IMessage)(object)value.Value.Value).ClearChangedParent();
+                }
+
                 map.Remove(item.Key);
                 value.List.Remove(value);
+                DeletedChanged(item.Key);
                 return true;
             }
 
@@ -445,6 +497,11 @@ namespace Kdsync
             return true;
         }
 
+        public void Init(Action changedParent)
+        {
+            _changedParent = changedParent;
+        }
+
         public void MergeFrom(ref ParseContext ctx, Codec codec)
         {
             int byteLimit = ctx.ReadLength();
@@ -484,12 +541,10 @@ namespace Kdsync
             if (clear)
             {
                 Clear();
-                _clear = true;
             }
             foreach (var deleteKey in deleteKeys)
             {
                 Remove(deleteKey);
-                _deletes.Add(deleteKey);
             }
             foreach (ref ValueTuple<int, int> entry in entries.ToArray().AsSpan())
             {
@@ -547,7 +602,6 @@ namespace Kdsync
             {
                 this[key] = codec.ValueCodec.Read(ref valueCtx);
             }
-            _updates.Add(key);
 
             ctx.CheckReadEndOfStreamTag();
             if (!ctx.ReachedLimit)
@@ -580,7 +634,6 @@ namespace Kdsync
             }
 
             this[key] = val;
-            _updates.Add(key);
 
             ctx.CheckReadEndOfStreamTag();
             if (!ctx.ReachedLimit)
@@ -589,15 +642,68 @@ namespace Kdsync
             }
         }
 
+        private void ClearedChanged()
+        {
+            if (_clear && _deletes.Count == 0 && _updates.Count == 0)
+                return;
+
+            _clear = true;
+            _updates.Clear();
+            _deletes.Clear();
+            _changedParent?.Invoke();
+        }
+
+        private void UpdatedChanged(TKey key)
+        {
+            if (_updates.Contains(key))
+                return;
+
+            _updates.Add(key);
+            _deletes.Remove(key);
+            _changedParent?.Invoke();
+        }
+
+        private void DeletedChanged(TKey key)
+        {
+            if (_deletes.Contains(key))
+                return;
+
+            _updates.Remove(key);
+            _deletes.Add(key);
+            _changedParent?.Invoke();
+        }
+
         public void RaiseChanged()
         {
             if (!_clear && _deletes.Count == 0 && _updates.Count == 0)
                 return;
+
+            if (IsMessageValue)
+            {
+                foreach (var key in _updates.ToArray())
+                {
+                    if (TryGetValue(key, out var value) && value != null)
+                        ((IMessage)(object)value).RaiseChanged();
+                }
+            }
+
             OnChanged?.Invoke(this, new ChangedEvent(_clear, _deletes, _updates));
         }
 
         public void ClearChanged()
         {
+            if (!_clear && _deletes.Count == 0 && _updates.Count == 0)
+                return;
+
+            if (IsMessageValue)
+            {
+                foreach (var key in _updates.ToArray())
+                {
+                    if (TryGetValue(key, out var value) && value != null)
+                        ((IMessage)(object)value).ClearChanged();
+                }
+            }
+
             _clear = false;
             _deletes.Clear();
             _updates.Clear();

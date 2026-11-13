@@ -14,6 +14,8 @@ namespace Kdsync
 
         private static readonly EqualityComparer<T> EqualityComparer = EqualityComparers.GetEqualityComparer<T>();
 
+        private static readonly bool IsMessage = typeof(IMessage).IsAssignableFrom(typeof(T));
+
         private static readonly T[] EmptyArray = new T[0];
 
         private const int MinArraySize = 8;
@@ -21,6 +23,10 @@ namespace Kdsync
         private T[] array = EmptyArray;
 
         private int count;
+
+        private bool _changed;
+
+        private Action? _changedParent;
 
         public event Action<Repeated<T>, ChangedEvent>? OnChanged;
 
@@ -66,7 +72,21 @@ namespace Kdsync
                     throw new ArgumentOutOfRangeException("index");
                 }
 
+                var item = array[index];
+                if (EqualityComparer.Equals(item, value))
+                    return;
+
+                if (IsMessage)
+                {
+                    if (value != null && ((IMessage)(object)value).CheckChangedParent())
+                        throw new InvalidOperationException("the component should be removed from its original place first");
+                    if (item != null)
+                        ((IMessage)(object)item).ClearChangedParent();
+                    if (value != null)
+                        ((IMessage)(object)value).SetChangedParent(UpdateChanged);
+                }
                 array[index] = value;
+                UpdateChanged();
             }
         }
 
@@ -86,6 +106,11 @@ namespace Kdsync
             {
                 this[index] = (T)value;
             }
+        }
+
+        public void Init(Action changedParent)
+        {
+            _changedParent = changedParent;
         }
 
         public void MergeFrom(ref ParseContext ctx, FieldCodec<T> fieldCodec)
@@ -117,14 +142,49 @@ namespace Kdsync
             }
         }
 
+        private void UpdateChanged()
+        {
+            if (_changed)
+                return;
+
+            _changed = true;
+            _changedParent?.Invoke();
+        }
+
         public void RaiseChanged()
         {
+            if (!_changed)
+                return;
+
+            if (IsMessage)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var item = array[i];
+                    if (item != null)
+                        ((IMessage)(object)item).RaiseChanged();
+                }
+            }
+
             OnChanged?.Invoke(this, new ChangedEvent());
         }
 
         public void ClearChanged()
         {
+            if (!_changed)
+                return;
 
+            if (IsMessage)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var item = array[i];
+                    if (item != null)
+                        ((IMessage)(object)item).ClearChanged();
+                }
+            }
+
+            _changed = false;
         }
 
         private void EnsureSize(int size)
@@ -149,14 +209,34 @@ namespace Kdsync
 
         public void Add(T item)
         {
+            if (IsMessage && item != null && ((IMessage)(object)item).CheckChangedParent())
+                throw new InvalidOperationException("the component should be removed from its original place first");
+
             EnsureSize(count + 1);
             array[count++] = item;
+            if (IsMessage && item != null)
+                ((IMessage)(object)item).SetChangedParent(UpdateChanged);
+            UpdateChanged();
         }
 
         public void Clear()
         {
+            if (count == 0)
+                return;
+
+            if (IsMessage)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    var item = array[i];
+                    if (item != null)
+                        ((IMessage)(object)item).ClearChangedParent();
+                }
+            }
+
             Array.Clear(array, 0, count);
             count = 0;
+            UpdateChanged();
         }
 
         public bool Contains(T item)
@@ -173,13 +253,20 @@ namespace Kdsync
         {
             int num = IndexOf(item);
             if (num == -1)
-            {
                 return false;
+
+            if (IsMessage)
+            {
+                item = array[num];
+                if (item != null)
+                    ((IMessage)(object)item).ClearChangedParent();
             }
 
             Array.Copy(array, num + 1, array, num, count - num - 1);
             count--;
             array[count] = default(T);
+
+            UpdateChanged();
             return true;
         }
 
@@ -188,9 +275,26 @@ namespace Kdsync
             Preconditions.CheckNotNull(values, "values");
             if (values is Repeated<T> repeatedField)
             {
+                if (IsMessage)
+                {
+                    for (var i = 0; i < repeatedField.count; i++)
+                    {
+                        var item = repeatedField[i];
+                        if (item != null && ((IMessage)(object)item).CheckChangedParent())
+                            throw new InvalidOperationException("the component should be removed from its original place first");
+                    }
+                    for (var i = 0; i < repeatedField.count; i++)
+                    {
+                        var item = repeatedField[i];
+                        if (item != null)
+                            ((IMessage)(object)item).SetChangedParent(UpdateChanged);
+                    }
+                }
+
                 EnsureSize(count + repeatedField.count);
                 Array.Copy(repeatedField.array, 0, array, count, repeatedField.count);
                 count += repeatedField.count;
+                UpdateChanged();
                 return;
             }
 
@@ -207,9 +311,24 @@ namespace Kdsync
                     }
                 }
 
+                if (IsMessage)
+                {
+                    foreach (var item in collection)
+                    {
+                        if (item != null && ((IMessage)(object)item).CheckChangedParent())
+                            throw new InvalidOperationException("the component should be removed from its original place first");
+                    }
+                    foreach (var item in collection)
+                    {
+                        if (item != null)
+                            ((IMessage)(object)item).SetChangedParent(UpdateChanged);
+                    }
+                }
+
                 EnsureSize(count + num);
                 collection.CopyTo(array, count);
                 count += num;
+                UpdateChanged();
                 return;
             }
 
@@ -223,9 +342,7 @@ namespace Kdsync
         internal void AddRangeSpan(ReadOnlySpan<T> source)
         {
             if (source.IsEmpty)
-            {
                 return;
-            }
 
             if (default(T) == null)
             {
@@ -238,9 +355,24 @@ namespace Kdsync
                 }
             }
 
+            if (IsMessage)
+            {
+                foreach (var item in source)
+                {
+                    if (item != null && ((IMessage)(object)item).CheckChangedParent())
+                        throw new InvalidOperationException("the component should be removed from its original place first");
+                }
+                foreach (var item in source)
+                {
+                    if (item != null)
+                        ((IMessage)(object)item).SetChangedParent(UpdateChanged);
+                }
+            }
+
             EnsureSize(count + source.Length);
             source.CopyTo(array.AsSpan(count));
             count += source.Length;
+            UpdateChanged();
         }
 
         public void Add(IEnumerable<T> values)
@@ -327,10 +459,19 @@ namespace Kdsync
                 throw new ArgumentOutOfRangeException("index");
             }
 
+            if (IsMessage)
+            {
+                if (item != null && ((IMessage)(object)item).CheckChangedParent())
+                    throw new InvalidOperationException("the component should be removed from its original place first");
+                if (item != null)
+                    ((IMessage)(object)item).SetChangedParent(UpdateChanged);
+            }
+
             EnsureSize(count + 1);
             Array.Copy(array, index, array, index + 1, count - index);
             array[index] = item;
             count++;
+            UpdateChanged();
         }
 
         public void RemoveAt(int index)
@@ -340,9 +481,17 @@ namespace Kdsync
                 throw new ArgumentOutOfRangeException("index");
             }
 
+            if (IsMessage)
+            {
+                var item = array[index];
+                if (item != null)
+                    ((IMessage)(object)item).ClearChangedParent();
+            }
+
             Array.Copy(array, index + 1, array, index, count - index - 1);
             count--;
             array[count] = default(T);
+            UpdateChanged();
         }
 
         public void Write(JsonWriter writer)
@@ -389,6 +538,9 @@ namespace Kdsync
 
         internal void SetCount(int targetCount)
         {
+            if (count == targetCount)
+                return;
+
             if (targetCount < 0)
             {
                 throw new ArgumentOutOfRangeException("targetCount", targetCount, "Non-negative number required.");
@@ -400,10 +552,20 @@ namespace Kdsync
             }
             else if (targetCount < count && RuntimeHelpers.IsReferenceOrContainsReferences<T>())
             {
+                if (IsMessage)
+                {
+                    for (int i = targetCount; i < count; i++)
+                    {
+                        var item = array[i];
+                        if (item != null)
+                            ((IMessage)(object)item).ClearChangedParent();
+                    }
+                }
                 Array.Clear(array, targetCount, count - targetCount);
             }
 
             count = targetCount;
+            UpdateChanged();
         }
 
         void ICollection.CopyTo(Array array, int index)
