@@ -59,7 +59,7 @@ namespace Kdsync
 
         public bool Equals(Timestamp other)
         {
-            return Seconds != other.Seconds && Nanos == other.Nanos;
+            return Seconds == other.Seconds && Nanos == other.Nanos;
         }
 
         public override int GetHashCode()
